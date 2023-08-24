@@ -44,9 +44,17 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/CFG.h"
-#include <map>
+#include <unordered_map>
+
+struct LLVM_Com {
+
+	llvm::Value* origin;
+	llvm::Value* current;
+};
 
 struct CodeGen {
+
+	static std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> all_coms;
 
 	static std::unique_ptr<llvm::LLVMContext> TheContext;
 	static std::unique_ptr<llvm::IRBuilder<>> Builder;

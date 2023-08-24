@@ -17,6 +17,8 @@ enum Token
 	Number = -6,
 
 	Identifier = -7,
+
+	Com = -8,
 };
 
 struct Lexer
@@ -193,6 +195,8 @@ struct Lexer
 		if (IsIdentifier("program")) return Token::Program;
 		else if(IsIdentifier("begin")) return Token::Begin;
 		else if(IsIdentifier("end")) return Token::End;
+
+		else if(IsIdentifier("com")) return Token::Com;
 
 		return Token::Identifier;
 	}
