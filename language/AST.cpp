@@ -69,6 +69,18 @@ llvm::Value* AST::Com::codegen() {
 	return CodeGen::all_coms[name]->origin;
 }
 
+llvm::Value* AST::Add::codegen() {
+
+	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
+	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
+
+	llvm::Value* result = CodeGen::Builder->CreateAdd(L, R);
+
+	AST::AddInstruction(target.get(), result);
+
+	return result;
+}
+
 llvm::Value* AST::GetCurrentInstruction(AST::Expression* e) {
 
 	return AST::GetCurrentInstructionByName(e->name);
@@ -91,6 +103,18 @@ llvm::Value* AST::GetOrCreateInstruction(AST::Expression* e) {
 		return e->codegen();
 
 	return result;
+}
+
+void AST::AddInstruction(AST::Expression* e, llvm::Value* l) {
+
+	AST::AddInstructionToName(e->name, l);
+}
+
+void AST::AddInstructionToName(std::string name, llvm::Value* l) {
+	
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+		CodeGen::all_coms[name]->current = l;
+	}
 }
 
 llvm::Value* AST::LLReturn::codegen() {

@@ -1,6 +1,10 @@
 program begin
 
 	com myVariable: i32 = 0;
+
+	add myVariable, 2;
+	add myVariable, 8;
+
 	llreturn myVariable;
 
 end

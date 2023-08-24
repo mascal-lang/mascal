@@ -21,6 +21,9 @@ enum Token
 	Com = -8,
 
 	LLReturn = -9,
+
+	Add = -10,
+	Sub = -11,
 };
 
 struct Lexer
@@ -201,6 +204,8 @@ struct Lexer
 		else if(IsIdentifier("com")) return Token::Com;
 
 		else if(IsIdentifier("llreturn")) return Token::LLReturn;
+
+		else if(IsIdentifier("add")) return Token::Add;
 
 		return Token::Identifier;
 	}

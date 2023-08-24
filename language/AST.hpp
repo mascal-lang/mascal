@@ -76,6 +76,22 @@ struct AST {
 		llvm::Value* codegen() override;
 	};
 
+	struct Add : public Expression {
+
+		std::unique_ptr<Expression> target;
+		std::unique_ptr<Expression> value;
+
+		Add(std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> value_in) {
+
+			target = std::move(target_in);
+			value = std::move(value_in);
+
+			name = target->name;
+		}
+
+		llvm::Value* codegen() override;
+	};
+
 	struct Program {
 
 		std::vector<std::unique_ptr<AST::Expression>> all_instructions;
@@ -87,8 +103,11 @@ struct AST {
 
 	static llvm::Value* GetCurrentInstruction(AST::Expression* e);
 	static llvm::Value* GetCurrentInstructionByName(std::string name);
-	
+
 	static llvm::Value* GetOrCreateInstruction(AST::Expression* e);
+
+	static void AddInstruction(AST::Expression* e, llvm::Value* l);
+	static void AddInstructionToName(std::string name, llvm::Value* l);
 };
 
 #endif

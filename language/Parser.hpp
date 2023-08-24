@@ -75,12 +75,30 @@ struct Parser {
 		return std::make_unique<AST::LLReturn>(std::move(expr));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseAdd() {
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::Add>(std::move(target), std::move(value));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
 		else if(Lexer::CurrentToken == Token::Number) 	{ return ParseNumber(); }
 		else if(Lexer::CurrentToken == Token::Com) 		{ return ParseCom(); }
 		else if(Lexer::CurrentToken == Token::LLReturn) { return ParseLLReturn(); }
+
+		else if(Lexer::CurrentToken == Token::Add) 		{ return ParseAdd(); }
+		//else if(Lexer::CurrentToken == Token::Sub) 		{ return ParseSub(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;
