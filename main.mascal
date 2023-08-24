@@ -1,10 +1,10 @@
 program begin
 
-	com myVariable: i32 = 0;
+	com firstVar: i32 = 10;
+	com secondVar: i32 = 12;
 
-	add myVariable, 2;
-	add myVariable, 8;
+	sub firstVar, secondVar;
 
-	llreturn myVariable;
+	llreturn firstVar;
 
 end

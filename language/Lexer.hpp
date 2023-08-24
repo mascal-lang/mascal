@@ -206,6 +206,7 @@ struct Lexer
 		else if(IsIdentifier("llreturn")) return Token::LLReturn;
 
 		else if(IsIdentifier("add")) return Token::Add;
+		else if(IsIdentifier("sub")) return Token::Sub;
 
 		return Token::Identifier;
 	}

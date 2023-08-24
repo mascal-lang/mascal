@@ -92,6 +92,22 @@ struct AST {
 		llvm::Value* codegen() override;
 	};
 
+	struct Sub : public Expression {
+
+		std::unique_ptr<Expression> target;
+		std::unique_ptr<Expression> value;
+
+		Sub(std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> value_in) {
+
+			target = std::move(target_in);
+			value = std::move(value_in);
+
+			name = target->name;
+		}
+
+		llvm::Value* codegen() override;
+	};
+
 	struct Program {
 
 		std::vector<std::unique_ptr<AST::Expression>> all_instructions;
