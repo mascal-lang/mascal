@@ -40,14 +40,36 @@ struct AST {
 		llvm::Value* codegen() override;
 	};
 
+	struct Variable : public Expression {
+
+		Variable(std::string name_in) {
+
+			name = name_in;
+		}
+
+		llvm::Value* codegen() override;
+	};
+
 	struct Com : public Expression {
 
 		std::unique_ptr<Expression> target;
 
 		Com(std::string name_in, std::unique_ptr<Type> ty_in, std::unique_ptr<Expression> target_in) {
-			
+
 			name = name_in;
 			ty = std::move(ty_in);
+			target = std::move(target_in);
+		}
+
+		llvm::Value* codegen() override;
+	};
+
+	struct LLReturn : public Expression {
+
+		std::unique_ptr<Expression> target;
+
+		LLReturn(std::unique_ptr<Expression> target_in) {
+
 			target = std::move(target_in);
 		}
 
@@ -62,6 +84,11 @@ struct AST {
 
 		llvm::Function* codegen();
 	};
+
+	static llvm::Value* GetCurrentInstruction(AST::Expression* e);
+	static llvm::Value* GetCurrentInstructionByName(std::string name);
+	
+	static llvm::Value* GetOrCreateInstruction(AST::Expression* e);
 };
 
 #endif

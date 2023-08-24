@@ -19,9 +19,7 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		/*return std::make_unique<AST::Variable>(idName);*/
-
-		return nullptr;
+		return std::make_unique<AST::Variable>(idName);
 	}
 
 	static std::unique_ptr<AST::Expression> ParseNumber() {
@@ -68,11 +66,21 @@ struct Parser {
 		return std::make_unique<AST::Com>(idName, std::move(ty), std::move(expr));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseLLReturn() {
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> expr = ParseExpression();
+
+		return std::make_unique<AST::LLReturn>(std::move(expr));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
 		else if(Lexer::CurrentToken == Token::Number) 	{ return ParseNumber(); }
 		else if(Lexer::CurrentToken == Token::Com) 		{ return ParseCom(); }
+		else if(Lexer::CurrentToken == Token::LLReturn) { return ParseLLReturn(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;

@@ -39,6 +39,19 @@ llvm::Value* AST::IntNumber::codegen() {
 	return llvm::ConstantInt::get(*CodeGen::TheContext, llvm::APInt(int_ty->getBitWidth(), num, false));
 }
 
+llvm::Value* AST::Variable::codegen() {
+
+	llvm::Value* result = AST::GetCurrentInstructionByName(name);
+
+	if(result == nullptr) {
+
+		std::cout << "Unknown variable '" << name << "'\n";
+		exit(1);
+	}
+
+	return result;
+}
+
 llvm::Value* AST::Com::codegen() {
 
 	llvm::Value* tc = target->codegen();
@@ -49,9 +62,38 @@ llvm::Value* AST::Com::codegen() {
 
 	CodeGen::all_coms[name] = std::move(lcom);
 
-	std::cout << name << " = ";
-	CodeGen::all_coms[name]->origin->print(llvm::outs());
-	std::cout << "\n";
+	//std::cout << name << " = ";
+	//CodeGen::all_coms[name]->origin->print(llvm::outs());
+	//std::cout << "\n";
 
 	return CodeGen::all_coms[name]->origin;
+}
+
+llvm::Value* AST::GetCurrentInstruction(AST::Expression* e) {
+
+	return AST::GetCurrentInstructionByName(e->name);
+}
+
+llvm::Value* AST::GetCurrentInstructionByName(std::string name) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+		return CodeGen::all_coms[name]->current;
+	}
+
+	return nullptr;
+}
+
+llvm::Value* AST::GetOrCreateInstruction(AST::Expression* e) {
+
+	llvm::Value* result = AST::GetCurrentInstruction(e);
+
+	if(result == nullptr)
+		return e->codegen();
+
+	return result;
+}
+
+llvm::Value* AST::LLReturn::codegen() {
+
+	return CodeGen::Builder->CreateRet(AST::GetOrCreateInstruction(target.get()));
 }
