@@ -50,6 +50,8 @@ struct LLVM_Com {
 
 	llvm::Value* origin;
 	llvm::Value* current;
+
+	std::unordered_map<std::string, llvm::Value*> states;
 };
 
 struct CodeGen {

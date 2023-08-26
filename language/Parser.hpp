@@ -136,6 +136,8 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
+		ResetMainTarget();
+
 		std::unique_ptr<AST::Expression> target = ParseExpression();
 
 		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
@@ -150,6 +152,8 @@ struct Parser {
 	static std::unique_ptr<AST::Expression> ParseSub() {
 
 		Lexer::GetNextToken();
+
+		ResetMainTarget();
 
 		std::unique_ptr<AST::Expression> target = ParseExpression();
 
@@ -225,6 +229,38 @@ struct Parser {
 		return std::make_unique<AST::Compare>(std::move(CompareOne), std::move(CompareTwo), finalCompare);
 	}
 
+	static std::unique_ptr<AST::Expression> ParseIf() {
+
+		Lexer::GetNextToken();
+
+		auto condition = ParseExpression();
+
+		if(Lexer::CurrentToken != Token::Then) {
+			ExprError("Expected 'then' in if block.");
+		}
+
+		Lexer::GetNextToken();
+
+		std::vector<std::unique_ptr<AST::Expression>> if_body;
+
+		while(Lexer::CurrentToken != Token::End) {
+
+			std::unique_ptr<AST::Expression> e = ParseExpression();
+
+			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside if block."); }
+
+			if_body.push_back(std::move(e));
+
+			ResetMainTarget();
+
+			Lexer::GetNextToken();
+		}
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::If>(std::move(condition), std::move(if_body));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -236,6 +272,8 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::Sub) 		{ return ParseSub(); }
 
 		else if(Lexer::CurrentToken == Token::Compare) 	{ return ParseCompare(); }
+
+		else if(Lexer::CurrentToken == Token::If) { return ParseIf(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;
@@ -260,7 +298,7 @@ struct Parser {
 
 			std::unique_ptr<AST::Expression> e = ParseExpression();
 
-			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction."); }
+			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside program."); }
 
 			all_instructions.push_back(std::move(e));
 

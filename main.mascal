@@ -1,10 +1,17 @@
 program begin
 
-	com firstVar: i32 = 10;
-	com secondVar: i32 = 12;
+	com firstVar: i32 = 5;
+	com secondVar: i32 = 10;
 
-	com boolResult: bool = COMPARE.IsMoreThan(firstVar, secondVar);
+	if COMPARE.IsLessThan(firstVar, secondVar) then
+		add firstVar, 200;
+		add secondVar, 20;
+	end;
 
-	llreturn boolResult;
+	if COMPARE.IsMoreThan(firstVar, secondVar) then
+		add secondVar, 20;
+	end;
+
+	llreturn secondVar;
 
 end

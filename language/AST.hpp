@@ -8,6 +8,12 @@
 #define EXPR_OBJ() std::unique_ptr<Expression>
 #define EXPR_OBJ_VECTOR() std::vector<std::unique_ptr<Expression>>
 
+#define MAP_FOREACH(x, y, z, w) for(std::map<x, y>::iterator w = z.begin(); w != z.end(); ++w)
+#define MAP_FOREACH_PAIR(x, y1, y2, z, w) for(std::map<x, std::pair<y1, y2>>::iterator w = z.begin(); w != z.end(); ++w)
+
+#define UNORDERED_MAP_FOREACH(x, y, z, w) for(std::unordered_map<x, y>::iterator w = z.begin(); w != z.end(); ++w)
+#define UNORDERED_MAP_FOREACH_PAIR(x, y1, y2, z, w) for(std::unordered_map<x, std::pair<y1, y2>>::iterator w = z.begin(); w != z.end(); ++w)
+
 struct AST {
 
 	struct Type {
@@ -139,6 +145,20 @@ struct AST {
 		llvm::Value* codegen() override;
 	};
 
+	struct If : public Expression {
+
+		EXPR_OBJ() condition;
+		EXPR_OBJ_VECTOR() if_body;
+
+		If(EXPR_OBJ() condition_in, EXPR_OBJ_VECTOR() if_body_in) {
+
+			condition = std::move(condition_in);
+			if_body = std::move(if_body_in);
+		}
+
+		llvm::Value* codegen() override;
+	};
+
 	struct Program {
 
 		EXPR_OBJ_VECTOR() all_instructions;
@@ -155,6 +175,10 @@ struct AST {
 
 	static void AddInstruction(AST::Expression* e, llvm::Value* l);
 	static void AddInstructionToName(std::string name, llvm::Value* l);
+
+	static void SaveState(std::string name, llvm::BasicBlock* bb);
+
+	static void CreateIfPHIs(llvm::BasicBlock* continueBlock);
 };
 
 #endif
