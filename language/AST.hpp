@@ -5,6 +5,9 @@
 
 #define NEW_TYPE(x) struct x : public Type { llvm::Type* codegen() override; }
 
+#define EXPR_OBJ() std::unique_ptr<Expression>
+#define EXPR_OBJ_VECTOR() std::vector<std::unique_ptr<Expression>>
+
 struct AST {
 
 	struct Type {
@@ -15,6 +18,7 @@ struct AST {
 	};
 
 	NEW_TYPE(Integer32);
+	NEW_TYPE(Integer1);
 
 	struct Expression {
 
@@ -52,9 +56,9 @@ struct AST {
 
 	struct Com : public Expression {
 
-		std::unique_ptr<Expression> target;
+		EXPR_OBJ() target;
 
-		Com(std::string name_in, std::unique_ptr<Type> ty_in, std::unique_ptr<Expression> target_in) {
+		Com(std::string name_in, std::unique_ptr<Type> ty_in, EXPR_OBJ() target_in) {
 
 			name = name_in;
 			ty = std::move(ty_in);
@@ -66,9 +70,9 @@ struct AST {
 
 	struct LLReturn : public Expression {
 
-		std::unique_ptr<Expression> target;
+		EXPR_OBJ() target;
 
-		LLReturn(std::unique_ptr<Expression> target_in) {
+		LLReturn(EXPR_OBJ() target_in) {
 
 			target = std::move(target_in);
 		}
@@ -78,10 +82,10 @@ struct AST {
 
 	struct Add : public Expression {
 
-		std::unique_ptr<Expression> target;
-		std::unique_ptr<Expression> value;
+		EXPR_OBJ() target;
+		EXPR_OBJ() value;
 
-		Add(std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> value_in) {
+		Add(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
 
 			target = std::move(target_in);
 			value = std::move(value_in);
@@ -94,10 +98,10 @@ struct AST {
 
 	struct Sub : public Expression {
 
-		std::unique_ptr<Expression> target;
-		std::unique_ptr<Expression> value;
+		EXPR_OBJ() target;
+		EXPR_OBJ() value;
 
-		Sub(std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> value_in) {
+		Sub(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
 
 			target = std::move(target_in);
 			value = std::move(value_in);
@@ -108,11 +112,38 @@ struct AST {
 		llvm::Value* codegen() override;
 	};
 
+	enum CompareType {
+		IsLessThan,
+		IsMoreThan,
+		IsEquals,
+		IsNotEquals,
+		IsLessThanOrEquals,
+		IsMoreThanOrEquals
+	};
+
+	struct Compare : public Expression {
+
+		EXPR_OBJ() compareOne;
+		EXPR_OBJ() compareTwo;
+
+		int cmp_type;
+
+		Compare(EXPR_OBJ() compareOne_in, EXPR_OBJ() compareTwo_in, int cmp_type_in) {
+
+			compareOne = std::move(compareOne_in);
+			compareTwo = std::move(compareTwo_in);
+
+			cmp_type = cmp_type_in;
+		}
+
+		llvm::Value* codegen() override;
+	};
+
 	struct Program {
 
-		std::vector<std::unique_ptr<AST::Expression>> all_instructions;
+		EXPR_OBJ_VECTOR() all_instructions;
 
-		Program(std::vector<std::unique_ptr<AST::Expression>> all_instructions) : all_instructions(std::move(all_instructions)) {}
+		Program(EXPR_OBJ_VECTOR() all_instructions) : all_instructions(std::move(all_instructions)) {}
 
 		llvm::Function* codegen();
 	};

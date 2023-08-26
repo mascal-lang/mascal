@@ -22,6 +22,7 @@ llvm::Function* AST::Program::codegen() {
 }
 
 llvm::Type* AST::Integer32::codegen() { return llvm::IntegerType::getInt32Ty(*CodeGen::TheContext); }
+llvm::Type* AST::Integer1::codegen() { return llvm::IntegerType::getInt1Ty(*CodeGen::TheContext); }
 
 llvm::Value* AST::IntNumber::codegen() {
 
@@ -91,6 +92,21 @@ llvm::Value* AST::Sub::codegen() {
 	AST::AddInstruction(target.get(), result);
 
 	return result;
+}
+
+llvm::Value* AST::Compare::codegen() {
+
+	llvm::Value* L = AST::GetOrCreateInstruction(compareOne.get());
+	llvm::Value* R = AST::GetOrCreateInstruction(compareTwo.get());
+
+	if(cmp_type == AST::CompareType::IsLessThan) { return CodeGen::Builder->CreateICmpUGT(R, L, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsMoreThan) { return CodeGen::Builder->CreateICmpUGT(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsEquals) { return CodeGen::Builder->CreateICmpEQ(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsNotEquals) { return CodeGen::Builder->CreateICmpNE(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsLessThanOrEquals) { return CodeGen::Builder->CreateICmpUGE(R, L, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsMoreThanOrEquals) { return CodeGen::Builder->CreateICmpUGE(L, R, "cmptmp"); }
+
+	return nullptr;
 }
 
 llvm::Value* AST::GetCurrentInstruction(AST::Expression* e) {

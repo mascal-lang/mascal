@@ -8,6 +8,54 @@
 
 struct Parser {
 
+	static std::string main_target;
+	static bool can_main_target_be_modified;
+
+	static std::unordered_map<std::string, AST::Type*> all_parser_coms;
+
+	static void AddParserCom(std::string name, AST::Type* t) {
+
+		all_parser_coms[name] = t;
+	}
+
+	static AST::Type* FindType(std::string name) {
+
+		if(all_parser_coms.find(name) != all_parser_coms.end())
+			return all_parser_coms[name];
+
+		ExprError("Variable type of '" + name + "' not found.");
+		return nullptr;
+	}
+
+	static std::unique_ptr<AST::Type> CopyType(AST::Type* t) {
+
+		if(dynamic_cast<AST::Integer32*>(t)) { return std::make_unique<AST::Integer32>(); }
+		else if(dynamic_cast<AST::Integer1*>(t)) { return std::make_unique<AST::Integer1>(); }
+
+		ExprError("Variable type to Copy not found.");
+		return nullptr;
+	}
+
+	static void StartMainTargetSystem() {
+
+		Parser::main_target.clear();
+		Parser::can_main_target_be_modified = true;
+	}
+
+	static void SetMainTarget(std::string n) {
+
+		if(can_main_target_be_modified) {
+			Parser::main_target = n;
+			Parser::can_main_target_be_modified = false;
+		}
+	}
+
+	static void ResetMainTarget() {
+
+		Parser::main_target.clear();
+		Parser::can_main_target_be_modified = true;
+	}
+
 	static void ExprError(std::string str) {
 		std::cout << "Parser Error: " << str << "\n";
 		exit(1);
@@ -16,6 +64,8 @@ struct Parser {
 	static std::unique_ptr<AST::Expression> ParseIdentifier() {
 
 		std::string idName = Lexer::IdentifierStr;
+
+		SetMainTarget(idName);
 
 		Lexer::GetNextToken();
 
@@ -28,7 +78,7 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		return std::make_unique<AST::IntNumber>(n, std::make_unique<AST::Integer32>());
+		return std::make_unique<AST::IntNumber>(n, CopyType(FindType(Parser::main_target)));
 	}
 
 	static std::unique_ptr<AST::Type> IdentStrToType() {
@@ -36,6 +86,7 @@ struct Parser {
 		std::string curr_ident = Lexer::IdentifierStr;
 
 		if(curr_ident == "i32") { return std::make_unique<AST::Integer32>(); }
+		else if(curr_ident == "i1" || curr_ident == "bool") { return std::make_unique<AST::Integer1>(); }
 
 		ExprError("Unknown type found.");
 		return nullptr;
@@ -46,6 +97,8 @@ struct Parser {
 		Lexer::GetNextToken();
 
 		std::string idName = Lexer::IdentifierStr;
+
+		SetMainTarget(idName);
 
 		Lexer::GetNextToken();
 
@@ -61,9 +114,13 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
+		AddParserCom(idName, ty.get());
+
 		std::unique_ptr<AST::Expression> expr = ParseExpression();
 
-		return std::make_unique<AST::Com>(idName, std::move(ty), std::move(expr));
+		auto final_com = std::make_unique<AST::Com>(idName, std::move(ty), std::move(expr));
+
+		return final_com;
 	}
 
 	static std::unique_ptr<AST::Expression> ParseLLReturn() {
@@ -105,6 +162,69 @@ struct Parser {
 		return std::make_unique<AST::Sub>(std::move(target), std::move(value));
 	}
 
+	static int TextToCompareType(std::string t) {
+
+		/*
+		IsLessThan,
+		IsMoreThan,
+		IsEquals,
+		IsNotEquals,
+		IsLessThanOrEquals,
+		IsMoreThanOrEquals
+		*/
+
+		if(t == "IsLessThan") { return AST::CompareType::IsLessThan; }
+		else if(t == "IsMoreThan") { return AST::CompareType::IsMoreThan; }
+		else if(t == "IsEquals") { return AST::CompareType::IsEquals; }
+		else if(t == "IsNotEquals") { return AST::CompareType::IsNotEquals; }
+		else if(t == "IsLessThanOrEquals") { return AST::CompareType::IsLessThanOrEquals; }
+		else if(t == "IsMoreThanOrEquals") { return AST::CompareType::IsMoreThanOrEquals; }
+
+		ExprError("Uknown compare type '" + t + "'");
+		return 0;
+	}
+
+	static std::unique_ptr<AST::Expression> ParseCompare() {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '.') {
+			ExprError("Expected '.'");
+		}
+
+		Lexer::GetNextToken();
+
+		std::string compareType = Lexer::IdentifierStr;
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '(') {
+			ExprError("Expected '(' to add arguments.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto CompareOne = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') {
+			ExprError("Expected ',' to split arguments.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto CompareTwo = ParseExpression();
+
+		if(Lexer::CurrentToken != ')') {
+			ExprError("Expected ')' to close arguments.");
+		}
+
+		Lexer::GetNextToken();
+
+		int finalCompare = TextToCompareType(compareType);
+
+		return std::make_unique<AST::Compare>(std::move(CompareOne), std::move(CompareTwo), finalCompare);
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -114,6 +234,8 @@ struct Parser {
 
 		else if(Lexer::CurrentToken == Token::Add) 		{ return ParseAdd(); }
 		else if(Lexer::CurrentToken == Token::Sub) 		{ return ParseSub(); }
+
+		else if(Lexer::CurrentToken == Token::Compare) 	{ return ParseCompare(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;
@@ -142,6 +264,8 @@ struct Parser {
 
 			all_instructions.push_back(std::move(e));
 
+			ResetMainTarget();
+
 			Lexer::GetNextToken();
 		}
 
@@ -156,6 +280,8 @@ struct Parser {
 	}
 
 	static void MainLoop() {
+
+		StartMainTargetSystem();
 
 		while (Lexer::CurrentToken != Token::EndOfFile) {
 

@@ -24,6 +24,8 @@ enum Token
 
 	Add = -10,
 	Sub = -11,
+
+	Compare = -12,
 };
 
 struct Lexer
@@ -207,6 +209,8 @@ struct Lexer
 
 		else if(IsIdentifier("add")) return Token::Add;
 		else if(IsIdentifier("sub")) return Token::Sub;
+
+		else if(IsIdentifier("COMPARE")) return Token::Compare;
 
 		return Token::Identifier;
 	}
