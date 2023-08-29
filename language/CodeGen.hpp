@@ -56,6 +56,8 @@ struct LLVM_Com {
 
 struct CodeGen {
 
+	static bool releaseMode;
+
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> all_coms;
 
 	static std::unique_ptr<llvm::LLVMContext> TheContext;

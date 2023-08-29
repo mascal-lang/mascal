@@ -229,7 +229,7 @@ struct Parser {
 		return std::make_unique<AST::Compare>(std::move(CompareOne), std::move(CompareTwo), finalCompare);
 	}
 
-	static std::unique_ptr<AST::Expression> ParseIf() {
+	static std::unique_ptr<AST::Expression> ParseIf(bool check_comma = true) {
 
 		Lexer::GetNextToken();
 
@@ -242,8 +242,9 @@ struct Parser {
 		Lexer::GetNextToken();
 
 		std::vector<std::unique_ptr<AST::Expression>> if_body;
+		std::vector<std::unique_ptr<AST::Expression>> else_body;
 
-		while(Lexer::CurrentToken != Token::End) {
+		while(Lexer::CurrentToken != Token::End && Lexer::CurrentToken != Token::Else) {
 
 			std::unique_ptr<AST::Expression> e = ParseExpression();
 
@@ -256,9 +257,41 @@ struct Parser {
 			Lexer::GetNextToken();
 		}
 
-		Lexer::GetNextToken();
+		if(Lexer::CurrentToken == Token::Else) {
 
-		return std::make_unique<AST::If>(std::move(condition), std::move(if_body));
+			Lexer::GetNextToken();
+
+			if(Lexer::CurrentToken == Token::If) {
+				std::unique_ptr<AST::Expression> if_b = ParseIf(false);
+
+				else_body.push_back(std::move(if_b));
+			}
+			else if(Lexer::CurrentToken == Token::Then) {
+
+				Lexer::GetNextToken();
+
+				while(Lexer::CurrentToken != Token::End) {
+
+					std::unique_ptr<AST::Expression> e = ParseExpression();
+
+					if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside else block."); }
+		
+					else_body.push_back(std::move(e));
+		
+					ResetMainTarget();
+		
+					Lexer::GetNextToken();
+				}
+			}
+			else {
+				ExprError("Expected 'if' or 'then' in else block.");
+			}
+		}
+
+		if(check_comma)
+			Lexer::GetNextToken();
+
+		return std::make_unique<AST::If>(std::move(condition), std::move(if_body), std::move(else_body));
 	}
 
 	static std::unique_ptr<AST::Expression> ParsePrimary() {

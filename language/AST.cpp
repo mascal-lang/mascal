@@ -18,6 +18,13 @@ llvm::Function* AST::Program::codegen() {
 		all_instructions[i]->codegen();
 	}
 
+	F->addFnAttr(llvm::Attribute::NoFree);
+	F->addFnAttr(llvm::Attribute::WillReturn);
+	F->addFnAttr(llvm::Attribute::NoUnwind);
+	F->addFnAttr(llvm::Attribute::MustProgress);
+
+	F->setCallingConv(llvm::CallingConv::GHC);
+
 	return F;
 }
 
@@ -99,14 +106,16 @@ llvm::Value* AST::Compare::codegen() {
 	llvm::Value* L = AST::GetOrCreateInstruction(compareOne.get());
 	llvm::Value* R = AST::GetOrCreateInstruction(compareTwo.get());
 
-	if(cmp_type == AST::CompareType::IsLessThan) { return CodeGen::Builder->CreateICmpUGT(R, L, "cmptmp"); }
-	if(cmp_type == AST::CompareType::IsMoreThan) { return CodeGen::Builder->CreateICmpUGT(L, R, "cmptmp"); }
-	if(cmp_type == AST::CompareType::IsEquals) { return CodeGen::Builder->CreateICmpEQ(L, R, "cmptmp"); }
-	if(cmp_type == AST::CompareType::IsNotEquals) { return CodeGen::Builder->CreateICmpNE(L, R, "cmptmp"); }
-	if(cmp_type == AST::CompareType::IsLessThanOrEquals) { return CodeGen::Builder->CreateICmpUGE(R, L, "cmptmp"); }
-	if(cmp_type == AST::CompareType::IsMoreThanOrEquals) { return CodeGen::Builder->CreateICmpUGE(L, R, "cmptmp"); }
+	llvm::Value* comp = nullptr;
 
-	return nullptr;
+	if(cmp_type == AST::CompareType::IsLessThan) { comp = CodeGen::Builder->CreateICmpUGT(R, L, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsMoreThan) { comp = CodeGen::Builder->CreateICmpUGT(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsEquals) { comp = CodeGen::Builder->CreateICmpEQ(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsNotEquals) { comp = CodeGen::Builder->CreateICmpNE(L, R, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsLessThanOrEquals) { comp = CodeGen::Builder->CreateICmpUGE(R, L, "cmptmp"); }
+	if(cmp_type == AST::CompareType::IsMoreThanOrEquals) { comp = CodeGen::Builder->CreateICmpUGE(L, R, "cmptmp"); }
+
+	return comp;
 }
 
 llvm::Value* AST::If::codegen() {
@@ -128,22 +137,70 @@ llvm::Value* AST::If::codegen() {
 	// }
 	// else 
 
-	CodeGen::Builder->CreateCondBr(conditionCodegen, IfBlock, ContinueBlock);
+	if(else_body.size() == 0) {
+		CodeGen::Builder->CreateCondBr(conditionCodegen, IfBlock, ContinueBlock);
+	}
+	else {
+		ElseBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "else");
+		CodeGen::Builder->CreateCondBr(conditionCodegen, IfBlock, ElseBlock);
+	}
 
 	CodeGen::Builder->SetInsertPoint(IfBlock);
 
+	llvm::BasicBlock* finalEntryBlock = nullptr;
+
+	if(parent_entry_block != nullptr) {
+		finalEntryBlock = parent_entry_block;
+	}
+	else {
+		finalEntryBlock = EntryBlock;
+	}
+
 	for(auto const& i: if_body) {
 
-		AST::SaveState(i->name, EntryBlock);
+		if(parent_entry_block == nullptr) {
+			AST::SaveState(i->name, finalEntryBlock);
+		}
+		else {
+			AST::SetExistingState(i->name, finalEntryBlock);
+		}
+
 		i->codegen();
 	}
 
 	CodeGen::Builder->CreateBr(ContinueBlock);
 
+	if(else_body.size() != 0) {
+
+		TheFunction->getBasicBlockList().push_back(ElseBlock);
+		CodeGen::Builder->SetInsertPoint(ElseBlock);
+
+		for(auto const& i: else_body) {
+
+			AST::SaveState(i->name, IfBlock);
+			AST::SetExistingState(i->name, finalEntryBlock);
+
+			i->parent_entry_block = finalEntryBlock;
+
+			i->codegen();
+		}
+	
+		for(auto const& i: else_body) {
+			AST::SaveState(i->name, ElseBlock);
+		}
+	
+		CodeGen::Builder->CreateBr(ContinueBlock);
+	}
+
 	TheFunction->getBasicBlockList().push_back(ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
-	AST::CreateIfPHIs(ContinueBlock);
+	if(else_body.size() == 0) {
+		AST::CreateIfPHIs(ContinueBlock);
+	}
+	else {
+		AST::CreateIfElsePHIs(ContinueBlock);
+	}
 
 	return nullptr;
 }
@@ -201,6 +258,18 @@ void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
 	}
 }
 
+void AST::SetExistingState(std::string name, llvm::BasicBlock* bb) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+	
+		std::string bbName = std::string(bb->getName());
+		if(CodeGen::all_coms[name]->states.find(bbName) != CodeGen::all_coms[name]->states.end()) {
+
+			CodeGen::all_coms[name]->current = CodeGen::all_coms[name]->states[bbName];
+		}
+	}
+}
+
 void AST::CreateIfPHIs(llvm::BasicBlock* continueBlock) {
 
 	std::vector<llvm::BasicBlock*> blockPreds;
@@ -229,6 +298,43 @@ void AST::CreateIfPHIs(llvm::BasicBlock* continueBlock) {
 	
 			phi->addIncoming(ifValue, blockPreds[0]);
 			phi->addIncoming(entryValue, blockPreds[1]);
+
+			it->second->current = phi;
+		}
+	}
+}
+
+void AST::CreateIfElsePHIs(llvm::BasicBlock* continueBlock) {
+
+	std::vector<llvm::BasicBlock*> blockPreds;
+
+	for (auto it = llvm::pred_begin(continueBlock), et = llvm::pred_end(continueBlock); it != et; ++it)
+	{
+		llvm::BasicBlock* predecessor = *it;
+		blockPreds.push_back(predecessor);
+	}
+
+	UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<LLVM_Com>, CodeGen::all_coms, it) {
+
+		llvm::Value* elseValue = nullptr;
+		llvm::Value* ifValue = nullptr;
+		
+		std::string bbPreds0 = std::string(blockPreds[1]->getName());
+		std::string bbPreds1 = std::string(blockPreds[0]->getName());
+
+		if(it->second->states.find(bbPreds0) != it->second->states.end()) {
+
+			ifValue = it->second->states[bbPreds0];
+		}
+
+		if(it->second->states.find(bbPreds1) != it->second->states.end()) {
+
+			elseValue = it->second->states[bbPreds1];
+	
+			auto phi = CodeGen::Builder->CreatePHI(ifValue->getType(), 2, "phi");
+	
+			phi->addIncoming(elseValue, blockPreds[0]);
+			phi->addIncoming(ifValue, blockPreds[1]);
 
 			it->second->current = phi;
 		}

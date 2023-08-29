@@ -8,8 +8,12 @@ program begin
 		add secondVar, 20;
 	end;
 
-	if COMPARE.IsMoreThan(firstVar, secondVar) then
+	if COMPARE.IsLessThan(firstVar, 100) then
 		add secondVar, 20;
+	else if COMPARE.IsLessThan(firstVar, 190) then
+		add secondVar, 2000;
+	else then
+		add secondVar, 1000;
 	end;
 
 	llreturn secondVar;

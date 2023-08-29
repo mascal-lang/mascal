@@ -5,17 +5,35 @@
 
 int main(int argc, char const *argv[])
 {
-	std::ifstream t("main.mascal");
-	std::string str((std::istreambuf_iterator<char>(t)),
-  	             std::istreambuf_iterator<char>());
+	CodeGen::releaseMode = false;
 
-	CodeGen::Initialize();
+	if(argc > 1) {
 
-	Lexer::AddContent(str);
+		std::string cmd = argv[1];
 
-	Lexer::Start();
+		if(cmd == "build") {
 
-	Parser::MainLoop();
+			//if(argc < 2) {
+			//	cmd = argv[2];
+
+			//	if(cmd == "release") {
+			//		CodeGen::releaseMode = true;
+			//	}
+			//}
+
+			std::ifstream t("main.mascal");
+			std::string str((std::istreambuf_iterator<char>(t)),
+  			             std::istreambuf_iterator<char>());
+		
+			CodeGen::Initialize();
+		
+			Lexer::AddContent(str);
+		
+			Lexer::Start();
+		
+			Parser::MainLoop();
+		}
+	}
 
 	return 0;
 }

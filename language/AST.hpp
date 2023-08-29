@@ -34,6 +34,8 @@ struct AST {
 
 		std::unique_ptr<Type> ty;
 
+		llvm::BasicBlock* parent_entry_block = nullptr;
+
 		virtual llvm::Value* codegen() = 0;
 	};
 
@@ -149,11 +151,13 @@ struct AST {
 
 		EXPR_OBJ() condition;
 		EXPR_OBJ_VECTOR() if_body;
+		EXPR_OBJ_VECTOR() else_body;
 
-		If(EXPR_OBJ() condition_in, EXPR_OBJ_VECTOR() if_body_in) {
+		If(EXPR_OBJ() condition_in, EXPR_OBJ_VECTOR() if_body_in, EXPR_OBJ_VECTOR() else_body_in) {
 
 			condition = std::move(condition_in);
 			if_body = std::move(if_body_in);
+			else_body = std::move(else_body_in);
 		}
 
 		llvm::Value* codegen() override;
@@ -177,8 +181,11 @@ struct AST {
 	static void AddInstructionToName(std::string name, llvm::Value* l);
 
 	static void SaveState(std::string name, llvm::BasicBlock* bb);
+	static void SetExistingState(std::string name, llvm::BasicBlock* bb);
 
 	static void CreateIfPHIs(llvm::BasicBlock* continueBlock);
+
+	static void CreateIfElsePHIs(llvm::BasicBlock* continueBlock);
 };
 
 #endif

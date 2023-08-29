@@ -29,6 +29,7 @@ enum Token
 
 	If = -13,
 	Then = -14,
+	Else = -15,
 };
 
 struct Lexer
@@ -217,6 +218,7 @@ struct Lexer
 
 		else if(IsIdentifier("if")) return Token::If;
 		else if(IsIdentifier("then")) return Token::Then;
+		else if(IsIdentifier("else")) return Token::Else;
 
 		return Token::Identifier;
 	}

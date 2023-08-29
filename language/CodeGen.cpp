@@ -6,6 +6,8 @@ std::unique_ptr<llvm::Module> 		CodeGen::TheModule;
 
 std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> CodeGen::all_coms;
 
+bool CodeGen::releaseMode = false;
+
 void CodeGen::Initialize()
 {
 	// Open a new context and module.
