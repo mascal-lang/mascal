@@ -14,3 +14,5 @@ int Lexer::CurrentToken;
 std::string Lexer::line_as_string;
 
 std::vector<std::string> Lexer::all_lines_vector;
+
+LexerIsInside Lexer::isInside;

@@ -2,6 +2,7 @@
 #define PARSER_HPP
 
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 #include "Lexer.hpp"
 #include "AST.hpp"
@@ -10,6 +11,10 @@ struct Parser {
 
 	static std::string main_target;
 	static bool can_main_target_be_modified;
+
+	static std::string current_procedure_name;
+
+	static std::vector<std::unique_ptr<AST::Procedure>> all_procedures;
 
 	static std::unordered_map<std::string, AST::Type*> all_parser_coms;
 
@@ -61,13 +66,76 @@ struct Parser {
 		exit(1);
 	}
 
+	static std::unique_ptr<AST::Procedure> CloneProcedure(std::string name) {
+
+		for(auto const& i: all_procedures) {
+
+			if(i->procName == name) {
+				return i->Clone();
+			}
+		}
+
+		ExprError("Procedure '" + name + "' not found.");
+		return nullptr;
+	}
+
+	static std::unique_ptr<AST::Expression> ParseCall(std::string name) {
+
+		Lexer::GetNextToken();
+
+		std::vector<std::unique_ptr<AST::Expression>> call_arguments;
+
+		std::unique_ptr<AST::Procedure> proc_copy = CloneProcedure(name);
+		CLONE_EXPR_VECTOR(proc_copy->body, body_clone);
+
+		while(Lexer::CurrentToken != ')') {
+
+			auto I = ParseIdentifier();
+
+			call_arguments.push_back(std::move(I));
+
+			if(Lexer::CurrentToken != ',') {
+				if(Lexer::CurrentToken != ')') {
+					ExprError("Expected ',' to split arguments or ')' to end call.");
+				}
+				else {
+					break;
+				}
+			}
+
+			Lexer::GetNextToken();
+		}
+
+		if(Lexer::CurrentToken == ')') {
+			Lexer::GetNextToken();
+		}
+
+		for(auto const& i: body_clone) {
+
+			int Idx = 0;
+			for(auto const& i: proc_copy->all_arguments) {
+
+				if(proc_copy->all_arguments[Idx]->name == i->name) {
+
+					i->name = call_arguments[Idx]->name;
+				}
+			}
+		}
+
+		return std::make_unique<AST::ProcedureCall>(std::move(body_clone), std::make_unique<AST::Variable>(name + "_return"));
+	}
+
 	static std::unique_ptr<AST::Expression> ParseIdentifier() {
 
 		std::string idName = Lexer::IdentifierStr;
 
-		SetMainTarget(idName);
-
 		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken == '(') {
+			return ParseCall(idName);
+		}
+
+		SetMainTarget(idName);
 
 		return std::make_unique<AST::Variable>(idName);
 	}
@@ -130,6 +198,23 @@ struct Parser {
 		std::unique_ptr<AST::Expression> expr = ParseExpression();
 
 		return std::make_unique<AST::LLReturn>(std::move(expr));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseReturn() {
+
+		if(Lexer::isInside == LexerIsInside::AProgram) {
+			return ParseLLReturn();
+		}
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		SetMainTarget(Parser::current_procedure_name + "_return");
+
+		std::unique_ptr<AST::Expression> expr = ParseExpression();
+
+		return std::make_unique<AST::ComStore>(std::make_unique<AST::Variable>(Parser::current_procedure_name + "_return"), std::move(expr));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseAdd() {
@@ -294,6 +379,23 @@ struct Parser {
 		return std::make_unique<AST::If>(std::move(condition), std::move(if_body), std::move(else_body));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseComStore() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::ComStore>(std::move(target), std::move(value));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -307,6 +409,10 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::Compare) 	{ return ParseCompare(); }
 
 		else if(Lexer::CurrentToken == Token::If) { return ParseIf(); }
+
+		else if(Lexer::CurrentToken == Token::Return) { return ParseReturn(); }
+
+		else if(Lexer::CurrentToken == Token::ComStore) { return ParseComStore(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;
@@ -343,11 +449,114 @@ struct Parser {
 		return std::make_unique<AST::Program>(std::move(all_instructions));
 	}
 
+	static std::unique_ptr<AST::Procedure> ParseProcedure() {
+
+		Lexer::isInside = LexerIsInside::AProcedure;
+
+		Lexer::GetNextToken();
+
+		std::string procName = Lexer::IdentifierStr;
+
+		Parser::current_procedure_name = procName;
+
+		Lexer::GetNextToken();
+
+		std::vector<std::string> all_argument_var_types;
+		std::vector<std::unique_ptr<AST::Expression>> all_arguments;
+		std::vector<std::unique_ptr<AST::Type>> all_argument_types;
+		std::vector<std::unique_ptr<AST::Expression>> body;
+
+		if(Lexer::CurrentToken != '(') { ExprError("Expected '(' to add arguments."); }
+
+		Lexer::GetNextToken();
+
+		while(Lexer::CurrentToken != ')') {
+
+			if(Lexer::CurrentToken == Token::Com)
+				all_argument_var_types.push_back("com");
+
+			auto I = ParseIdentifier();
+
+			if(Lexer::CurrentToken != ':') { ExprError("Expected ':' to specify argument type."); }
+
+			Lexer::GetNextToken();
+
+			auto T = IdentStrToType();
+
+			Lexer::GetNextToken();
+
+			if(Lexer::CurrentToken != ',') {
+				if(Lexer::CurrentToken == ')') {
+					break;
+				}
+				else {
+					ExprError("Expected ',' to add another argument or ')' to close argument list.");
+				}
+			}
+
+			all_arguments.push_back(std::move(I));
+			all_argument_types.push_back(std::move(T));
+
+			Lexer::GetNextToken();
+		}
+
+		if(Lexer::CurrentToken != ')') { ExprError("Expected ')' to close argument list."); }
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != ':') { ExprError("Expected ':' to specify procedure type."); }
+
+		Lexer::GetNextToken();
+
+		auto procType = IdentStrToType();
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != Token::Begin) { ExprError("Expected 'begin' in procedure."); }
+
+		Lexer::GetNextToken();
+
+		auto return_value = std::make_unique<AST::Com>(procName + "_return", procType->Clone(), std::make_unique<AST::IntNumber>(0, procType->Clone()));
+
+		AddParserCom(procName + "_return", return_value->ty.get());
+
+		body.push_back(std::move(return_value));
+
+		while (Lexer::CurrentToken != Token::End) { 
+
+			std::unique_ptr<AST::Expression> e = ParseExpression();
+
+			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside procedure."); }
+
+			body.push_back(std::move(e));
+
+			ResetMainTarget();
+
+			Lexer::GetNextToken();
+		}
+
+		return std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments), std::move(all_argument_types), std::move(procType), std::move(body));
+	}
+
 	static void HandleProgram() {
+
+		Lexer::isInside = LexerIsInside::AProgram;
 
 		auto program = ParseProgram();
 
+		std::ofstream myfile;
+  		myfile.open("llm_main.mascal");
+  		myfile << program->ToLLMascal();
+  		myfile.close();
+
 		program->codegen()->print(llvm::outs());
+	}
+
+	static void HandleProcedure() {
+
+		auto proc = ParseProcedure();
+
+		all_procedures.push_back(std::move(proc));
 	}
 
 	static void MainLoop() {
@@ -360,6 +569,7 @@ struct Parser {
 
 			if (Lexer::CurrentToken == Token::EndOfFile) 	break;
 			if (Lexer::CurrentToken == Token::Program) 		HandleProgram();
+			if (Lexer::CurrentToken == Token::Procedure) 	HandleProcedure();
 		}
 	}
 };

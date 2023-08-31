@@ -1,6 +1,8 @@
 #include "AST.hpp"
 #include <iostream>
 
+int AST::slash_t_count = 0;
+
 llvm::Function* AST::Program::codegen() {
 
 	std::vector<llvm::Type*> llvmArgs;
@@ -18,10 +20,15 @@ llvm::Function* AST::Program::codegen() {
 		all_instructions[i]->codegen();
 	}
 
-	F->addFnAttr(llvm::Attribute::NoFree);
-	F->addFnAttr(llvm::Attribute::WillReturn);
-	F->addFnAttr(llvm::Attribute::NoUnwind);
+	// mustprogress nofree norecurse nosync nounwind readnone willreturn
+
 	F->addFnAttr(llvm::Attribute::MustProgress);
+	F->addFnAttr(llvm::Attribute::NoFree);
+	F->addFnAttr(llvm::Attribute::NoRecurse);
+	F->addFnAttr(llvm::Attribute::NoSync);
+	F->addFnAttr(llvm::Attribute::NoUnwind);
+	F->addFnAttr(llvm::Attribute::ReadNone);
+	F->addFnAttr(llvm::Attribute::WillReturn);
 
 	F->setCallingConv(llvm::CallingConv::GHC);
 
@@ -30,6 +37,15 @@ llvm::Function* AST::Program::codegen() {
 
 llvm::Type* AST::Integer32::codegen() { return llvm::IntegerType::getInt32Ty(*CodeGen::TheContext); }
 llvm::Type* AST::Integer1::codegen() { return llvm::IntegerType::getInt1Ty(*CodeGen::TheContext); }
+
+llvm::Value* AST::ProcedureCall::codegen() {
+
+	for(auto const& i: body) {
+		i->codegen();
+	}
+
+	return return_obj->codegen();
+}
 
 llvm::Value* AST::IntNumber::codegen() {
 
@@ -101,6 +117,15 @@ llvm::Value* AST::Sub::codegen() {
 	return result;
 }
 
+llvm::Value* AST::ComStore::codegen() {
+
+	llvm::Value* result = AST::GetOrCreateInstruction(value.get());
+
+	AST::AddInstruction(target.get(), result);
+
+	return result;
+}
+
 llvm::Value* AST::Compare::codegen() {
 
 	llvm::Value* L = AST::GetOrCreateInstruction(compareOne.get());
@@ -130,13 +155,6 @@ llvm::Value* AST::If::codegen() {
 	llvm::BasicBlock* ElseBlock = nullptr;
 	llvm::BasicBlock* ContinueBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "continue");
 
-	// if(ElseBody.size() != 0)
-	// {
-	// 	ElseBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "else");
-	// 	CodeGen::Builder->CreateCondBr(ConditionV, IfBlock, ElseBlock);
-	// }
-	// else 
-
 	if(else_body.size() == 0) {
 		CodeGen::Builder->CreateCondBr(conditionCodegen, IfBlock, ContinueBlock);
 	}
@@ -158,14 +176,17 @@ llvm::Value* AST::If::codegen() {
 
 	for(auto const& i: if_body) {
 
-		if(parent_entry_block == nullptr) {
-			AST::SaveState(i->name, finalEntryBlock);
-		}
-		else {
+		AST::SaveState(i->name, EntryBlock);
+
+		if(parent_entry_block != nullptr) {
 			AST::SetExistingState(i->name, finalEntryBlock);
 		}
 
 		i->codegen();
+	}
+
+	for(auto const& i: if_body) {
+		AST::SaveState(i->name, IfBlock);
 	}
 
 	CodeGen::Builder->CreateBr(ContinueBlock);
@@ -177,7 +198,6 @@ llvm::Value* AST::If::codegen() {
 
 		for(auto const& i: else_body) {
 
-			AST::SaveState(i->name, IfBlock);
 			AST::SetExistingState(i->name, finalEntryBlock);
 
 			i->parent_entry_block = finalEntryBlock;
@@ -195,11 +215,10 @@ llvm::Value* AST::If::codegen() {
 	TheFunction->getBasicBlockList().push_back(ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
-	if(else_body.size() == 0) {
-		AST::CreateIfPHIs(ContinueBlock);
-	}
-	else {
-		AST::CreateIfElsePHIs(ContinueBlock);
+	AST::CreateIfElsePHIs(ContinueBlock);
+
+	for(auto const& i: if_body) {
+		AST::SaveState(i->name, ContinueBlock);
 	}
 
 	return nullptr;
@@ -254,6 +273,8 @@ void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
 		if(CodeGen::all_coms[name]->states.find(bbName) == CodeGen::all_coms[name]->states.end()) {
 
 			CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
+
+			//std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
 		}
 	}
 }
@@ -318,25 +339,53 @@ void AST::CreateIfElsePHIs(llvm::BasicBlock* continueBlock) {
 
 		llvm::Value* elseValue = nullptr;
 		llvm::Value* ifValue = nullptr;
+
+		llvm::BasicBlock* elseBlock = nullptr;
+		llvm::BasicBlock* ifBlock = nullptr;
 		
 		std::string bbPreds0 = std::string(blockPreds[1]->getName());
 		std::string bbPreds1 = std::string(blockPreds[0]->getName());
 
+		std::string bbPreds2 = std::string(continueBlock->getName());
+
+		//std::cout << "bbPreds0: " << bbPreds0 << "\n";
+		//std::cout << "bbPreds1: " << bbPreds1 << "\n";
+
 		if(it->second->states.find(bbPreds0) != it->second->states.end()) {
 
 			ifValue = it->second->states[bbPreds0];
+			ifBlock = blockPreds[1];
+		}
+		else {
+			//std::cout << "'" << bbPreds0 << "' (bbPreds0) not found!\n";
 		}
 
 		if(it->second->states.find(bbPreds1) != it->second->states.end()) {
 
 			elseValue = it->second->states[bbPreds1];
+			elseBlock = blockPreds[0];
 	
 			auto phi = CodeGen::Builder->CreatePHI(ifValue->getType(), 2, "phi");
 	
-			phi->addIncoming(elseValue, blockPreds[0]);
-			phi->addIncoming(ifValue, blockPreds[1]);
+			phi->addIncoming(elseValue, elseBlock);
+			phi->addIncoming(ifValue, ifBlock);
 
 			it->second->current = phi;
+		}
+		else if(it->second->states.find(bbPreds2) != it->second->states.end()) {
+			
+			elseValue = it->second->states[bbPreds2];
+			elseBlock = continueBlock;
+
+			auto phi = CodeGen::Builder->CreatePHI(ifValue->getType(), 2, "phi");
+	
+			phi->addIncoming(elseValue, elseBlock);
+			phi->addIncoming(ifValue, ifBlock);
+
+			it->second->current = phi;
+		}
+		else {
+			//std::cout << "'" << bbPreds1 << "' (bbPreds1) and '" << bbPreds2 << "' (bbPreds2) not found!\n";
 		}
 	}
 }

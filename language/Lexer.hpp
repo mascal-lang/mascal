@@ -30,6 +30,17 @@ enum Token
 	If = -13,
 	Then = -14,
 	Else = -15,
+
+	Return = -16,
+
+	Procedure = -17,
+
+	ComStore = -18,
+};
+
+enum LexerIsInside {
+	AProgram,
+	AProcedure
 };
 
 struct Lexer
@@ -54,6 +65,8 @@ struct Lexer
 	static std::string line_as_string;
 
 	static std::vector<std::string> all_lines_vector;
+
+	static LexerIsInside isInside;
 
 	static void Start()
 	{
@@ -219,6 +232,12 @@ struct Lexer
 		else if(IsIdentifier("if")) return Token::If;
 		else if(IsIdentifier("then")) return Token::Then;
 		else if(IsIdentifier("else")) return Token::Else;
+
+		else if(IsIdentifier("return")) return Token::Return;
+
+		else if(IsIdentifier("proc")) return Token::Procedure;
+
+		else if(IsIdentifier("comstore")) return Token::ComStore;
 
 		return Token::Identifier;
 	}

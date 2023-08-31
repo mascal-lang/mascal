@@ -1,21 +1,14 @@
+proc getThree(): i32
+begin
+	return 3;
+end
+
 program begin
 
-	com firstVar: i32 = 5;
-	com secondVar: i32 = 10;
+	com storeTest: i32 = 0;
 
-	if COMPARE.IsLessThan(firstVar, secondVar) then
-		add firstVar, 200;
-		add secondVar, 20;
-	end;
+	comstore storeTest, getThree();
 
-	if COMPARE.IsLessThan(firstVar, 100) then
-		add secondVar, 20;
-	else if COMPARE.IsLessThan(firstVar, 190) then
-		add secondVar, 2000;
-	else then
-		add secondVar, 1000;
-	end;
-
-	llreturn secondVar;
+	return storeTest;
 
 end
