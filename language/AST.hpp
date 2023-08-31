@@ -154,8 +154,12 @@ struct AST {
 
 			std::string res;
 
-			res += target->ToLLMascalBefore();
-			res += "\n";
+			if(target->ToLLMascalBefore() != "") {
+
+				res += target->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "com ";
 			res += name;
@@ -202,8 +206,13 @@ struct AST {
 		std::string ToLLMascal() override {
 
 			std::string res;
-			res += target->ToLLMascalBefore();
-			res += "\n";
+
+			if(target->ToLLMascalBefore() != "") {
+
+				res += target->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "llreturn ";
 			res += target->ToLLMascal();
@@ -251,8 +260,12 @@ struct AST {
 
 			std::string res;
 
-			res += value->ToLLMascalBefore();
-			res += "\n";
+			if(value->ToLLMascalBefore() != "") {
+
+				res += value->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "add ";
 			res += target->ToLLMascal();
@@ -302,8 +315,12 @@ struct AST {
 
 			std::string res;
 
-			res += value->ToLLMascalBefore();
-			res += "\n";
+			if(value->ToLLMascalBefore() != "") {
+
+				res += value->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "sub ";
 			res += target->ToLLMascal();
@@ -353,8 +370,12 @@ struct AST {
 
 			std::string res;
 
-			res += value->ToLLMascalBefore();
-			res += "\n";
+			if(value->ToLLMascalBefore() != "") {
+
+				res += value->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "comstore ";
 			res += target->ToLLMascal();
@@ -423,10 +444,19 @@ struct AST {
 
 			std::string res;
 
-			res += compareOne->ToLLMascalBefore();
-			res += "\n";
-			res += compareTwo->ToLLMascalBefore();
-			res += "\n";
+			if(compareOne->ToLLMascalBefore() != "") {
+
+				res += compareOne->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			if(compareTwo->ToLLMascalBefore() != "") {
+
+				res += compareTwo->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "COMPARE.";
 			
@@ -485,8 +515,12 @@ struct AST {
 
 			std::string res;
 
-			res += condition->ToLLMascalBefore();
-			res += "\n";
+			if(condition->ToLLMascalBefore() != "") {
+
+				res += condition->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
 
 			res += "if ";
 			
@@ -572,9 +606,12 @@ struct AST {
 
 			for(auto const& i: body) {
 
-				res += GetSlashT();
-				res += i->ToLLMascalBefore();
-				res += "\n";
+				if(i->ToLLMascalBefore() != "") {
+
+					res += i->ToLLMascalBefore();
+					res += "\n";
+					res += GetSlashT();
+				}
 
 				res += GetSlashT();
 				res += i->ToLLMascal();
