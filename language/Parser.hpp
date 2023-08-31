@@ -27,6 +27,32 @@ struct Parser {
 
 		if(all_parser_coms.find(name) != all_parser_coms.end())
 			return all_parser_coms[name];
+		else {
+
+			for(auto const& i : all_procedures) {
+
+				if(i->procName == Parser::current_procedure_name) {
+
+					std::cout << "Checking Procedure " << i->procName << " with Current " << Parser::current_procedure_name << "...\n";
+
+					if(i->all_arguments.size() == 0) {
+						std::cout << i->procName << " has no arguments!\n";
+					}
+
+					int Idx = 0;
+					for(auto const& args : i->all_arguments) {
+
+						std::cout << "Checking " << args->name << "...\n";
+						if(args->name == name) {
+
+							return i->all_argument_types[Idx].get();
+						}
+
+						Idx++;
+					}
+				}
+			}
+		}
 
 		ExprError("Variable type of '" + name + "' not found.");
 		return nullptr;
@@ -113,12 +139,14 @@ struct Parser {
 		for(auto const& i: body_clone) {
 
 			int Idx = 0;
-			for(auto const& i: proc_copy->all_arguments) {
+			for(auto const& p: proc_copy->all_arguments) {
 
-				if(proc_copy->all_arguments[Idx]->name == i->name) {
+				if(i->ContainsName(p->name)) {
 
-					i->name = call_arguments[Idx]->name;
+					i->ReplaceTargetNameTo(p->name, call_arguments[Idx]->name);
 				}
+
+				Idx++;
 			}
 		}
 
@@ -475,6 +503,8 @@ struct Parser {
 			if(Lexer::CurrentToken == Token::Com)
 				all_argument_var_types.push_back("com");
 
+			Lexer::GetNextToken();
+
 			auto I = ParseIdentifier();
 
 			if(Lexer::CurrentToken != ':') { ExprError("Expected ':' to specify argument type."); }
@@ -485,6 +515,11 @@ struct Parser {
 
 			Lexer::GetNextToken();
 
+			std::cout << "Adding " << I->name << " to " << procName << "...\n";
+
+			all_arguments.push_back(std::move(I));
+			all_argument_types.push_back(std::move(T));
+
 			if(Lexer::CurrentToken != ',') {
 				if(Lexer::CurrentToken == ')') {
 					break;
@@ -493,9 +528,6 @@ struct Parser {
 					ExprError("Expected ',' to add another argument or ')' to close argument list.");
 				}
 			}
-
-			all_arguments.push_back(std::move(I));
-			all_argument_types.push_back(std::move(T));
 
 			Lexer::GetNextToken();
 		}
@@ -512,11 +544,19 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
+		auto proc = std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments), std::move(all_argument_types), std::move(procType));
+
+		all_procedures.push_back(std::move(proc));
+
+		auto newProc = all_procedures[all_procedures.size() - 1]->CloneWithoutBody();
+
+		std::cout << "Clone Success!\n";
+
 		if(Lexer::CurrentToken != Token::Begin) { ExprError("Expected 'begin' in procedure."); }
 
 		Lexer::GetNextToken();
 
-		auto return_value = std::make_unique<AST::Com>(procName + "_return", procType->Clone(), std::make_unique<AST::IntNumber>(0, procType->Clone()));
+		auto return_value = std::make_unique<AST::Com>(procName + "_return", newProc->proc_type->Clone(), std::make_unique<AST::IntNumber>(0, newProc->proc_type->Clone()));
 
 		AddParserCom(procName + "_return", return_value->ty.get());
 
@@ -535,7 +575,11 @@ struct Parser {
 			Lexer::GetNextToken();
 		}
 
-		return std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments), std::move(all_argument_types), std::move(procType), std::move(body));
+		newProc->body = std::move(body);
+
+		all_procedures.pop_back();
+
+		return newProc;
 	}
 
 	static void HandleProgram() {

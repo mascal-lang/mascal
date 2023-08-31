@@ -23,6 +23,10 @@
 
 #define DEFAULT_TOLLMASCALBEFORE() std::string ToLLMascalBefore() override { return ""; }
 
+#define DEFAULT_REPLACE_TARGET_NAME_TO() void ReplaceTargetNameTo(std::string from, std::string to) override { return; }
+
+#define DEFAULT_CONTAINS_NAME() bool ContainsName(std::string str) override { return false; }
+
 struct AST {
 
 	struct Type {
@@ -67,6 +71,10 @@ struct AST {
 
 		virtual std::string ToLLMascalBefore() = 0;
 
+		virtual void ReplaceTargetNameTo(std::string from, std::string to) = 0;
+
+		virtual bool ContainsName(std::string s) = 0;
+
 		virtual std::unique_ptr<Expression> Clone() = 0;
 	};
 
@@ -83,6 +91,8 @@ struct AST {
 		llvm::Value* codegen() override;
 
 		DEFAULT_TOLLMASCALBEFORE()
+		DEFAULT_REPLACE_TARGET_NAME_TO()
+		DEFAULT_CONTAINS_NAME()
 
 		std::string ToLLMascal() override {
 			return std::to_string(num);
@@ -108,6 +118,18 @@ struct AST {
 		}
 
 		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str;
+		}
 
 		EXPR_OBJ() Clone() override {
 
@@ -148,6 +170,18 @@ struct AST {
 
 		DEFAULT_TOLLMASCALBEFORE()
 
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str;
+		}
+
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<Com>(name, ty->Clone(), target->Clone());
@@ -179,6 +213,18 @@ struct AST {
 		}
 
 		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str;
+		}
 
 		EXPR_OBJ() Clone() override {
 
@@ -219,6 +265,18 @@ struct AST {
 
 		DEFAULT_TOLLMASCALBEFORE()
 
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str || value->name == str;
+		}
+
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<Add>(target->Clone(), value->Clone());
@@ -258,6 +316,18 @@ struct AST {
 
 		DEFAULT_TOLLMASCALBEFORE()
 
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str || value->name == str;
+		}
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<Sub>(target->Clone(), value->Clone());
@@ -296,6 +366,26 @@ struct AST {
 		}
 
 		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+
+			if(target->name == from) {
+				target->name = to;
+			}
+
+			if(value->name == from) {
+				value->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str || value->name == str;
+		}
 
 		EXPR_OBJ() Clone() override {
 
@@ -357,6 +447,18 @@ struct AST {
 		}
 
 		DEFAULT_TOLLMASCALBEFORE()
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || compareOne->name == str || compareTwo->name == str;
+		}
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(compareOne->name == from) {
+				compareOne->name = to;
+			}
+		}
 
 		EXPR_OBJ() Clone() override {
 
@@ -431,6 +533,13 @@ struct AST {
 
 		DEFAULT_TOLLMASCALBEFORE()
 
+		DEFAULT_REPLACE_TARGET_NAME_TO()
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || condition->name == str;
+		}
+
 		EXPR_OBJ() Clone() override {
 
 			CLONE_EXPR_VECTOR(if_body, clone_if_body);
@@ -475,6 +584,10 @@ struct AST {
 			return res;
 		}
 
+		DEFAULT_REPLACE_TARGET_NAME_TO()
+
+		DEFAULT_CONTAINS_NAME()
+
 		EXPR_OBJ() Clone() override {
 
 			CLONE_EXPR_VECTOR(body, body_clone);
@@ -495,6 +608,17 @@ struct AST {
 		TYPE_OBJ() proc_type;
 
 		EXPR_OBJ_VECTOR() body;
+
+		Procedure(std::string procName_in, std::vector<std::string> all_argument_var_types_in, EXPR_OBJ_VECTOR() all_arguments_in, TYPE_OBJ_VECTOR() all_argument_types_in, TYPE_OBJ() proc_type_in) {
+
+			procName = procName_in;
+
+			all_argument_var_types = all_argument_var_types_in;
+			all_arguments = std::move(all_arguments_in);
+			all_argument_types = std::move(all_argument_types_in);
+
+			proc_type = std::move(proc_type_in);
+		}
 
 		Procedure(std::string procName_in, std::vector<std::string> all_argument_var_types_in, EXPR_OBJ_VECTOR() all_arguments_in, TYPE_OBJ_VECTOR() all_argument_types_in, TYPE_OBJ() proc_type_in, EXPR_OBJ_VECTOR() body_in) {
 
@@ -517,6 +641,14 @@ struct AST {
 			CLONE_EXPR_VECTOR(body, body_clone);
 
 			return std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments_clone), std::move(all_argument_types_clone), proc_type->Clone(), std::move(body_clone));
+		}
+
+		std::unique_ptr<AST::Procedure> CloneWithoutBody() {
+
+			CLONE_EXPR_VECTOR(all_arguments, all_arguments_clone);
+			CLONE_TYPE_VECTOR(all_argument_types, all_argument_types_clone);
+
+			return std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments_clone), std::move(all_argument_types_clone), proc_type->Clone());
 		}
 
 		llvm::Value* codegen();

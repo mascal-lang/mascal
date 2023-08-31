@@ -1,13 +1,15 @@
-proc getThree(): i32
+
+proc addThreeTo(com argOne: i32): i32
 begin
-	return 3;
+	add argOne, 3;
+	return argOne;
 end
 
 program begin
 
 	com storeTest: i32 = 0;
 
-	comstore storeTest, getThree();
+	comstore storeTest, addThreeTo(storeTest);
 
 	return storeTest;
 
