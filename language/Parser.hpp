@@ -33,16 +33,16 @@ struct Parser {
 
 				if(i->procName == Parser::current_procedure_name) {
 
-					std::cout << "Checking Procedure " << i->procName << " with Current " << Parser::current_procedure_name << "...\n";
+					//std::cout << "Checking Procedure " << i->procName << " with Current " << Parser::current_procedure_name << "...\n";
 
-					if(i->all_arguments.size() == 0) {
-						std::cout << i->procName << " has no arguments!\n";
-					}
+					//if(i->all_arguments.size() == 0) {
+					//	std::cout << i->procName << " has no arguments!\n";
+					//}
 
 					int Idx = 0;
 					for(auto const& args : i->all_arguments) {
 
-						std::cout << "Checking " << args->name << "...\n";
+						//std::cout << "Checking " << args->name << "...\n";
 						if(args->name == name) {
 
 							return i->all_argument_types[Idx].get();
@@ -515,8 +515,6 @@ struct Parser {
 
 			Lexer::GetNextToken();
 
-			std::cout << "Adding " << I->name << " to " << procName << "...\n";
-
 			all_arguments.push_back(std::move(I));
 			all_argument_types.push_back(std::move(T));
 
@@ -550,7 +548,7 @@ struct Parser {
 
 		auto newProc = all_procedures[all_procedures.size() - 1]->CloneWithoutBody();
 
-		std::cout << "Clone Success!\n";
+		//std::cout << "Clone Success!\n";
 
 		if(Lexer::CurrentToken != Token::Begin) { ExprError("Expected 'begin' in procedure."); }
 

@@ -7,10 +7,11 @@ end
 
 program begin
 
-	com storeTest: i32 = 0;
+	com firstArgument: i32 = 0;
+	com finalResult: i32 = 2;
 
-	comstore storeTest, addThreeTo(storeTest);
+	comstore finalResult, addThreeTo(firstArgument);
 
-	return storeTest;
+	return finalResult;
 
 end
