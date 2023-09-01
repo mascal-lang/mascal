@@ -591,7 +591,9 @@ struct Parser {
   		myfile << program->ToLLMascal();
   		myfile.close();
 
-		program->codegen()->print(llvm::outs());
+		program->codegen();
+
+		CodeGen::TheModule->print(llvm::outs(), nullptr);
 	}
 
 	static void HandleProcedure() {
