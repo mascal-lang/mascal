@@ -176,6 +176,10 @@ struct AST {
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
+			if(name == from) {
+				name = to;
+			}
+
 			if(target->name == from) {
 				target->name = to;
 			}
@@ -646,6 +650,8 @@ struct AST {
 
 		EXPR_OBJ_VECTOR() body;
 
+		int call_count = 0;
+
 		Procedure(std::string procName_in, std::vector<std::string> all_argument_var_types_in, EXPR_OBJ_VECTOR() all_arguments_in, TYPE_OBJ_VECTOR() all_argument_types_in, TYPE_OBJ() proc_type_in) {
 
 			procName = procName_in;
@@ -677,7 +683,11 @@ struct AST {
 
 			CLONE_EXPR_VECTOR(body, body_clone);
 
-			return std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments_clone), std::move(all_argument_types_clone), proc_type->Clone(), std::move(body_clone));
+			auto proc = std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments_clone), std::move(all_argument_types_clone), proc_type->Clone(), std::move(body_clone));
+
+			proc->call_count = call_count;
+
+			return proc;
 		}
 
 		std::unique_ptr<AST::Procedure> CloneWithoutBody() {

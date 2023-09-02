@@ -105,11 +105,26 @@ struct Parser {
 		return nullptr;
 	}
 
+	static void AddCallCountToProcedure(std::string name) {
+
+		for(auto const& i: all_procedures) {
+
+			if(i->procName == name) {
+				i->call_count += 1;
+				return;
+			}
+		}
+
+		ExprError("Procedure '" + name + "' not found.");
+	}
+
 	static std::unique_ptr<AST::Expression> ParseCall(std::string name) {
 
 		Lexer::GetNextToken();
 
 		std::vector<std::unique_ptr<AST::Expression>> call_arguments;
+
+		AddCallCountToProcedure(name);
 
 		std::unique_ptr<AST::Procedure> proc_copy = CloneProcedure(name);
 		CLONE_EXPR_VECTOR(proc_copy->body, body_clone);
@@ -138,6 +153,13 @@ struct Parser {
 
 		for(auto const& i: body_clone) {
 
+			if(i->ContainsName(name + "_return")) {
+				i->ReplaceTargetNameTo(name + "_return", name + "_return" + std::to_string(proc_copy->call_count));
+			}
+		}
+
+		for(auto const& i: body_clone) {
+
 			int Idx = 0;
 			for(auto const& p: proc_copy->all_arguments) {
 
@@ -150,7 +172,7 @@ struct Parser {
 			}
 		}
 
-		return std::make_unique<AST::ProcedureCall>(std::move(body_clone), std::make_unique<AST::Variable>(name + "_return"));
+		return std::make_unique<AST::ProcedureCall>(std::move(body_clone), std::make_unique<AST::Variable>(name + "_return" + std::to_string(proc_copy->call_count)));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseIdentifier() {
