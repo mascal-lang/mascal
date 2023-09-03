@@ -483,10 +483,46 @@ struct Parser {
 		return std::make_unique<AST::Add>(std::move(L), std::move(R));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseSubOperator(std::unique_ptr<AST::Expression> L) {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '=') {
+			ExprError("Expected '='.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto R = ParseExpression();
+
+		return std::make_unique<AST::Sub>(std::move(L), std::move(R));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseEqualsOperator(std::unique_ptr<AST::Expression> L) {
+
+		Lexer::GetNextToken();
+
+		if(all_parser_coms.find(L->name) != all_parser_coms.end()) {
+
+			auto R = ParseExpression();
+
+			return std::make_unique<AST::ComStore>(std::move(L), std::move(R));
+		}
+
+		ExprError("Unknown var type found.");
+		return nullptr;
+	}
+
 	static std::unique_ptr<AST::Expression> ParseBinaryOperator(std::unique_ptr<AST::Expression> L) {
 
-		if(Lexer::CurrentToken == '+') {
+		if(Lexer::CurrentToken == '=') {
+			return ParseEqualsOperator(std::move(L));
+		}
+		else if(Lexer::CurrentToken == '+') {
 			return ParseAddOperator(std::move(L));
+		}
+		else if(Lexer::CurrentToken == '-') {
+			return ParseSubOperator(std::move(L));
 		}
 
 		return L;
