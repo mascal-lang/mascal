@@ -468,9 +468,35 @@ struct Parser {
 		return nullptr;
 	}
 
+	static std::unique_ptr<AST::Expression> ParseAddOperator(std::unique_ptr<AST::Expression> L) {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '=') {
+			ExprError("Expected '='.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto R = ParseExpression();
+
+		return std::make_unique<AST::Add>(std::move(L), std::move(R));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseBinaryOperator(std::unique_ptr<AST::Expression> L) {
+
+		if(Lexer::CurrentToken == '+') {
+			return ParseAddOperator(std::move(L));
+		}
+
+		return L;
+	}
+
 	static std::unique_ptr<AST::Expression> ParseExpression() {
 
-		return ParsePrimary();
+		auto P = ParsePrimary();
+
+		return ParseBinaryOperator(std::move(P));
 	}
 
 	static std::unique_ptr<AST::Program> ParseProgram() {

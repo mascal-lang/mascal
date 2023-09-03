@@ -1,6 +1,6 @@
-proc addThreeTo(com argOne: i32): i32
-begin
-	add argOne, 3;
+proc addThreeTo(com argOne: i32): i32 begin
+
+	argOne += 3;
 	return argOne;
 end
 
@@ -9,8 +9,8 @@ program begin
 	com firstArgument: i32 = 5;
 	com finalResult: i32 = 2;
 
-	add finalResult, addThreeTo(firstArgument);
-	add finalResult, addThreeTo(finalResult);
+	finalResult += addThreeTo(firstArgument);
+	finalResult += addThreeTo(finalResult);
 
 	return finalResult;
 
