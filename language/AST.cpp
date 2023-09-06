@@ -35,7 +35,11 @@ llvm::Function* AST::Program::codegen() {
 	return F;
 }
 
+llvm::Type* AST::Integer128::codegen() { return llvm::IntegerType::getInt128Ty(*CodeGen::TheContext); }
+llvm::Type* AST::Integer64::codegen() { return llvm::IntegerType::getInt64Ty(*CodeGen::TheContext); }
 llvm::Type* AST::Integer32::codegen() { return llvm::IntegerType::getInt32Ty(*CodeGen::TheContext); }
+llvm::Type* AST::Integer16::codegen() { return llvm::IntegerType::getInt16Ty(*CodeGen::TheContext); }
+llvm::Type* AST::Integer8::codegen() { return llvm::IntegerType::getInt8Ty(*CodeGen::TheContext); }
 llvm::Type* AST::Integer1::codegen() { return llvm::IntegerType::getInt1Ty(*CodeGen::TheContext); }
 
 llvm::Value* AST::ProcedureCall::codegen() {
@@ -65,6 +69,10 @@ llvm::Value* AST::IntNumber::codegen() {
 
 llvm::Value* AST::Variable::codegen() {
 
+	for(auto const& i : initializers) {
+		i->codegen();
+	}
+
 	llvm::Value* result = AST::GetCurrentInstructionByName(name);
 
 	if(result == nullptr) {
@@ -78,7 +86,7 @@ llvm::Value* AST::Variable::codegen() {
 
 llvm::Value* AST::Com::codegen() {
 
-	llvm::Value* tc = target->codegen();
+	llvm::Value* tc = AST::GetOrCreateInstruction(target.get());
 
 	std::unique_ptr<LLVM_Com> lcom = std::make_unique<LLVM_Com>();
 	lcom->origin = tc;
@@ -86,11 +94,28 @@ llvm::Value* AST::Com::codegen() {
 
 	CodeGen::all_coms[name] = std::move(lcom);
 
-	//std::cout << name << " = ";
-	//CodeGen::all_coms[name]->origin->print(llvm::outs());
-	//std::cout << "\n";
-
 	return CodeGen::all_coms[name]->origin;
+}
+
+llvm::Value* AST::Mem::codegen() {
+
+	llvm::Value* tc = AST::GetOrCreateInstruction(target.get());
+
+	std::unique_ptr<LLVM_Mem> lmem = std::make_unique<LLVM_Mem>();
+
+	llvm::Type* get_type = ty->codegen();
+
+	llvm::Value* alloc_origin = CodeGen::Builder->CreateAlloca(get_type, 0, name);
+	lmem->origin = alloc_origin;
+
+	llvm::Value* store_target = CodeGen::Builder->CreateStore(tc, lmem->origin);
+	lmem->current = alloc_origin;
+
+	lmem->ty = get_type;
+
+	CodeGen::all_mems[name] = std::move(lmem);
+
+	return CodeGen::all_mems[name]->origin;
 }
 
 llvm::Value* AST::Add::codegen() {
@@ -124,6 +149,41 @@ llvm::Value* AST::ComStore::codegen() {
 	AST::AddInstruction(target.get(), result);
 
 	return result;
+}
+
+llvm::Value* AST::GetAllocaFromMem(AST::Expression* e) {
+
+	if(CodeGen::all_mems.find(e->name) != CodeGen::all_mems.end()) {
+		return CodeGen::all_mems[e->name]->origin;
+	}
+
+	return nullptr;
+}
+
+llvm::Value* AST::MemStore::codegen() {
+
+	llvm::Value* result = AST::GetOrCreateInstruction(value.get());
+
+	llvm::Value* mem_alloca = AST::GetAllocaFromMem(target.get());
+
+	if(mem_alloca == nullptr) {
+		std::cout << "Error: Mem Origin not found for 'memstore'.\n";
+		exit(1);
+	}
+
+	return CodeGen::Builder->CreateStore(result, mem_alloca);
+}
+
+llvm::Value* AST::LoadMem::codegen() {
+
+	llvm::Value* mem_alloca = AST::GetAllocaFromMem(target.get());
+
+	if(mem_alloca == nullptr) {
+		std::cout << "Error: Mem Origin not found for 'loadmem'.\n";
+		exit(1);
+	}
+
+	return CodeGen::Builder->CreateLoad(CodeGen::all_mems[target->name]->ty, mem_alloca, target->name);
 }
 
 llvm::Value* AST::Compare::codegen() {
@@ -235,6 +295,10 @@ llvm::Value* AST::GetCurrentInstructionByName(std::string name) {
 		return CodeGen::all_coms[name]->current;
 	}
 
+	if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
+		return CodeGen::all_mems[name]->current;
+	}
+
 	return nullptr;
 }
 
@@ -242,8 +306,9 @@ llvm::Value* AST::GetOrCreateInstruction(AST::Expression* e) {
 
 	llvm::Value* result = AST::GetCurrentInstruction(e);
 
-	if(result == nullptr)
+	if(result == nullptr) {
 		return e->codegen();
+	}
 
 	return result;
 }

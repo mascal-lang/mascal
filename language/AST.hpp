@@ -40,7 +40,11 @@ struct AST {
 		virtual std::unique_ptr<Type> Clone() = 0;
 	};
 
+	NEW_TYPE(Integer128, return "i128"; );
+	NEW_TYPE(Integer64, return "i64"; );
 	NEW_TYPE(Integer32, return "i32"; );
+	NEW_TYPE(Integer16, return "i16"; );
+	NEW_TYPE(Integer8, return "i8"; );
 	NEW_TYPE(Integer1, return "i1"; );
 
 	static int slash_t_count;
@@ -106,8 +110,11 @@ struct AST {
 
 	struct Variable : public Expression {
 
-		Variable(std::string name_in) {
+		EXPR_OBJ_VECTOR() initializers;
 
+		Variable(std::string name_in, EXPR_OBJ_VECTOR() initializers_in = {} ) {
+
+			initializers = std::move(initializers_in);
 			name = name_in;
 		}
 
@@ -117,7 +124,22 @@ struct AST {
 			return name;
 		}
 
-		DEFAULT_TOLLMASCALBEFORE()
+		std::string ToLLMascalBefore() override {
+
+			std::string res;
+
+			for(auto const& i : initializers) {
+
+				if(i->ToLLMascalBefore() != "") {
+
+					res += i->ToLLMascalBefore();
+					res += "\n";
+					res += GetSlashT();
+				}
+			}
+
+			return res;
+		}
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
@@ -193,6 +215,65 @@ struct AST {
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<Com>(name, ty->Clone(), target->Clone());
+		}
+	};
+
+	struct Mem : public Expression {
+
+		EXPR_OBJ() target;
+
+		Mem(std::string name_in, std::unique_ptr<Type> ty_in, EXPR_OBJ() target_in) {
+
+			name = name_in;
+			ty = std::move(ty_in);
+			target = std::move(target_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			if(target->ToLLMascalBefore() != "") {
+
+				res += target->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			res += "mem ";
+			res += name;
+			res += ": ";
+			res += ty->ToLLMascal();
+			res += " = ";
+			res += target->ToLLMascal();
+			res += ";";
+
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<Mem>(name, ty->Clone(), target->Clone());
 		}
 	};
 
@@ -415,6 +496,121 @@ struct AST {
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<ComStore>(target->Clone(), value->Clone());
+		}
+	};
+
+	struct LoadMem : public Expression {
+
+		EXPR_OBJ() target;
+
+		LoadMem(EXPR_OBJ() target_in) {
+
+			target = std::move(target_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascalBefore() override {
+
+			std::string res;
+
+			if(target->ToLLMascalBefore() != "") {
+
+				res += target->ToLLMascalBefore();
+				res += "\n";
+			}
+
+			return res;
+		}
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "loadmem ";
+			res += target->ToLLMascal();
+
+			return res;
+		}
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<LoadMem>(target->Clone());
+		}
+	};
+
+	struct MemStore : public Expression {
+
+		EXPR_OBJ() target;
+		EXPR_OBJ() value;
+
+		MemStore(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
+
+			target = std::move(target_in);
+			value = std::move(value_in);
+
+			name = target->name;
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			if(value->ToLLMascalBefore() != "") {
+
+				res += value->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			res += "memstore ";
+			res += target->ToLLMascal();
+			res += ", ";
+			res += value->ToLLMascal();
+			res += ";";
+
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+
+			if(target->name == from) {
+				target->name = to;
+			}
+
+			if(value->name == from) {
+				value->name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->name == str || value->name == str;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<MemStore>(target->Clone(), value->Clone());
 		}
 	};
 
@@ -718,6 +914,14 @@ struct AST {
 			slash_t_count += 1;
 
 			for(auto const& i: all_instructions) {
+
+				if(i->ToLLMascalBefore() != "") {
+
+					res += GetSlashT();
+					res += i->ToLLMascalBefore();
+					res += "\n";
+				}
+
 				res += GetSlashT();
 				res += i->ToLLMascal();
 				res += "\n";
@@ -735,6 +939,8 @@ struct AST {
 	static llvm::Value* GetCurrentInstructionByName(std::string name);
 
 	static llvm::Value* GetOrCreateInstruction(AST::Expression* e);
+
+	static llvm::Value* GetAllocaFromMem(AST::Expression* e);
 
 	static void AddInstruction(AST::Expression* e, llvm::Value* l);
 	static void AddInstructionToName(std::string name, llvm::Value* l);

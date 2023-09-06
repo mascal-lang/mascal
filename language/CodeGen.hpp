@@ -54,11 +54,22 @@ struct LLVM_Com {
 	std::unordered_map<std::string, llvm::Value*> states;
 };
 
+struct LLVM_Mem {
+
+	llvm::Value* origin;
+	llvm::Value* current;
+
+	llvm::Type* ty;
+
+	std::unordered_map<std::string, llvm::Value*> states;
+};
+
 struct CodeGen {
 
 	static bool releaseMode;
 
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> all_coms;
+	static std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> all_mems;
 
 	static std::unique_ptr<llvm::LLVMContext> TheContext;
 	static std::unique_ptr<llvm::IRBuilder<>> Builder;

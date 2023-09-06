@@ -1,16 +1,14 @@
-proc doSomeMath(com theMath: i32): i32 begin
-	
-	theMath += 2;
-	return theMath;
-end
-
 program begin
 
-	com firstArgument: i32 = 5;
-	com finalResult: i32 = 2;
+	mem finalResult: i32 = 0;
+	mem secondMemory: i32 = 0;
 
-	finalResult = doSomeMath(firstArgument);
+	finalResult += 2;
+	finalResult += 4;
+	finalResult += 8;
 
-	return finalResult;
+	secondMemory = finalResult;
+
+	return secondMemory;
 
 end

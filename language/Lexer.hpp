@@ -36,6 +36,8 @@ enum Token
 	Procedure = -17,
 
 	ComStore = -18,
+
+	Mem = -19,
 };
 
 enum LexerIsInside {
@@ -238,6 +240,8 @@ struct Lexer
 		else if(IsIdentifier("proc")) return Token::Procedure;
 
 		else if(IsIdentifier("comstore")) return Token::ComStore;
+
+		else if(IsIdentifier("mem")) return Token::Mem;
 
 		return Token::Identifier;
 	}

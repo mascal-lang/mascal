@@ -5,6 +5,7 @@ std::unique_ptr<llvm::IRBuilder<>> 	CodeGen::Builder;
 std::unique_ptr<llvm::Module> 		CodeGen::TheModule;
 
 std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> CodeGen::all_coms;
+std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> CodeGen::all_mems;
 
 bool CodeGen::releaseMode = false;
 
