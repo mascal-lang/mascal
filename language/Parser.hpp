@@ -87,7 +87,11 @@ struct Parser {
 
 	static std::unique_ptr<AST::Type> CopyType(AST::Type* t) {
 
-		if(dynamic_cast<AST::Integer32*>(t)) { return std::make_unique<AST::Integer32>(); }
+		if(dynamic_cast<AST::Integer128*>(t)) { return std::make_unique<AST::Integer128>(); }
+		else if(dynamic_cast<AST::Integer64*>(t)) { return std::make_unique<AST::Integer64>(); }
+		else if(dynamic_cast<AST::Integer32*>(t)) { return std::make_unique<AST::Integer32>(); }
+		else if(dynamic_cast<AST::Integer16*>(t)) { return std::make_unique<AST::Integer16>(); }
+		else if(dynamic_cast<AST::Integer8*>(t)) { return std::make_unique<AST::Integer8>(); }
 		else if(dynamic_cast<AST::Integer1*>(t)) { return std::make_unique<AST::Integer1>(); }
 
 		ExprError("Variable type to Copy not found.");
@@ -509,7 +513,56 @@ struct Parser {
 
 		std::unique_ptr<AST::Expression> value = ParseExpression();
 
-		return std::make_unique<AST::ComStore>(std::move(target), std::move(value));
+		return std::make_unique<AST::ComStore>(std::move(target), MemTreatment(std::move(value)));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseMemStore() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::MemStore>(std::move(target), MemTreatment(std::move(value)));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseLoadMem() {
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> expr = ParseExpression();
+
+		return std::make_unique<AST::LoadMem>(std::move(expr));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseIntCast() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		auto Expr = ParseExpression();
+
+		if(Lexer::CurrentToken != Token::To) {
+			ExprError("Expected 'to'.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto ty = IdentStrToType();
+
+		Lexer::GetNextToken();
+
+		std::cout << "Int Cast Parsed!\n";
+
+		return std::make_unique<AST::IntCast>(MemTreatment(std::move(Expr)), std::move(ty));
 	}
 
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
@@ -531,6 +584,10 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::ComStore) { return ParseComStore(); }
 
 		else if(Lexer::CurrentToken == Token::Mem) { return ParseMem(); }
+		else if(Lexer::CurrentToken == Token::LoadMem) { return ParseLoadMem(); }
+		else if(Lexer::CurrentToken == Token::MemStore) { return ParseMemStore(); }
+
+		else if(Lexer::CurrentToken == Token::IntCast) { return ParseIntCast(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;

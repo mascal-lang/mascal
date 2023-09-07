@@ -436,6 +436,63 @@ struct AST {
 		}
 	};
 
+	struct IntCast : public Expression {
+
+		EXPR_OBJ() target;
+		TYPE_OBJ() intType;
+
+		IntCast(EXPR_OBJ() target_in, TYPE_OBJ() intType_in) {
+
+			target = std::move(target_in);
+			intType = std::move(intType_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "intcast ";
+			res += target->ToLLMascal();
+			res += " to ";
+			res += intType->ToLLMascal();
+
+			return res;
+		}
+
+		std::string ToLLMascalBefore() override {
+
+			std::string res;
+
+			if(target->ToLLMascalBefore() != "") {
+
+				res += target->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			return res;
+		}
+
+		bool ContainsName(std::string str) override {
+
+			return target->name == str;
+		}
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(target->name == from) {
+				target->name = to;
+			}
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<IntCast>(target->Clone(), intType->Clone());
+		}
+	};
+
 	struct ComStore : public Expression {
 
 		EXPR_OBJ() target;

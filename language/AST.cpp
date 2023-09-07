@@ -64,7 +64,7 @@ llvm::Value* AST::IntNumber::codegen() {
 		exit(1);
 	}
 
-	return llvm::ConstantInt::get(*CodeGen::TheContext, llvm::APInt(int_ty->getBitWidth(), num, false));
+	return llvm::ConstantInt::get(*CodeGen::TheContext, llvm::APInt(int_ty->getBitWidth(), num, true));
 }
 
 llvm::Value* AST::Variable::codegen() {
@@ -140,6 +140,16 @@ llvm::Value* AST::Sub::codegen() {
 	AST::AddInstruction(target.get(), result);
 
 	return result;
+}
+
+llvm::Value* AST::IntCast::codegen() {
+
+	llvm::Value* targetC = AST::GetOrCreateInstruction(target.get());
+	llvm::Type* typeC = intType->codegen();
+
+	std::cout << "Generating Int Cast...\n";
+
+	return CodeGen::Builder->CreateIntCast(targetC, typeC, true, target->name);
 }
 
 llvm::Value* AST::ComStore::codegen() {

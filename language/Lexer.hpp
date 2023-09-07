@@ -38,6 +38,11 @@ enum Token
 	ComStore = -18,
 
 	Mem = -19,
+	LoadMem = -20,
+	MemStore = -21,
+
+	IntCast = -22,
+	To = -23,
 };
 
 enum LexerIsInside {
@@ -242,6 +247,11 @@ struct Lexer
 		else if(IsIdentifier("comstore")) return Token::ComStore;
 
 		else if(IsIdentifier("mem")) return Token::Mem;
+		else if(IsIdentifier("loadmem")) return Token::LoadMem;
+		else if(IsIdentifier("memstore")) return Token::MemStore;
+
+		else if(IsIdentifier("intcast")) return Token::IntCast;
+		else if(IsIdentifier("to")) return Token::To;
 
 		return Token::Identifier;
 	}

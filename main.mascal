@@ -1,7 +1,7 @@
 program begin
 
-	mem finalResult: i32 = 0;
-	mem secondMemory: i32 = 0;
+	com finalResult: i16 = 0;
+	com secondMemory: i16 = 0;
 
 	finalResult += 2;
 	finalResult += 4;
@@ -9,6 +9,9 @@ program begin
 
 	secondMemory = finalResult;
 
-	return secondMemory;
+	com castSM: i32 = intcast secondMemory to i32;
+	castSM += 1;
+
+	return castSM;
 
 end
