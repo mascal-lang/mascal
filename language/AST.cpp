@@ -147,8 +147,6 @@ llvm::Value* AST::IntCast::codegen() {
 	llvm::Value* targetC = AST::GetOrCreateInstruction(target.get());
 	llvm::Type* typeC = intType->codegen();
 
-	std::cout << "Generating Int Cast...\n";
-
 	return CodeGen::Builder->CreateIntCast(targetC, typeC, true, target->name);
 }
 

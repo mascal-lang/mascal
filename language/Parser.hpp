@@ -560,8 +560,6 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		std::cout << "Int Cast Parsed!\n";
-
 		return std::make_unique<AST::IntCast>(MemTreatment(std::move(Expr)), std::move(ty));
 	}
 
