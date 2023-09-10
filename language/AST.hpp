@@ -146,6 +146,10 @@ struct AST {
 			if(name == from) {
 				name = to;
 			}
+
+			for(auto const& i : initializers) {
+				i->ReplaceTargetNameTo(from, to);
+			}
 		}
 
 		bool ContainsName(std::string str) override {
@@ -202,14 +206,12 @@ struct AST {
 				name = to;
 			}
 
-			if(target->name == from) {
-				target->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str;
+			return name == str || target->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -261,14 +263,12 @@ struct AST {
 				name = to;
 			}
 
-			if(target->name == from) {
-				target->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str;
+			return name == str || target->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -310,14 +310,12 @@ struct AST {
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(target->name == from) {
-				target->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str;
+			return name == str || target->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -365,14 +363,17 @@ struct AST {
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(target->name == from) {
-				target->name = to;
+			if(name == from) {
+				name = to;
 			}
+
+			target->ReplaceTargetNameTo(from, to);
+			value->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str || value->name == str;
+			return name == str || target->ContainsName(str) || value->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -420,14 +421,17 @@ struct AST {
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str || value->name == str;
+			return name == str || target->ContainsName(str) || value->ContainsName(str);
 		}
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(target->name == from) {
-				target->name = to;
+			if(name == from) {
+				name = to;
 			}
+
+			target->ReplaceTargetNameTo(from, to);
+			value->ReplaceTargetNameTo(from, to);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -477,14 +481,12 @@ struct AST {
 
 		bool ContainsName(std::string str) override {
 
-			return target->name == str;
+			return target->ContainsName(str);
 		}
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(target->name == from) {
-				target->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -536,18 +538,13 @@ struct AST {
 				name = to;
 			}
 
-			if(target->name == from) {
-				target->name = to;
-			}
-
-			if(value->name == from) {
-				value->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
+			value->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str || value->name == str;
+			return name == str || target->ContainsName(str) || value->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -592,14 +589,12 @@ struct AST {
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(target->name == from) {
-				target->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str;
+			return name == str || target->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -651,18 +646,13 @@ struct AST {
 				name = to;
 			}
 
-			if(target->name == from) {
-				target->name = to;
-			}
-
-			if(value->name == from) {
-				value->name = to;
-			}
+			target->ReplaceTargetNameTo(from, to);
+			value->ReplaceTargetNameTo(from, to);
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->name == str || value->name == str;
+			return name == str || target->ContainsName(str) || value->ContainsName(str);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -737,14 +727,17 @@ struct AST {
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || compareOne->name == str || compareTwo->name == str;
+			return name == str || compareOne->ContainsName(str) || compareTwo->ContainsName(str);
 		}
 
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
-			if(compareOne->name == from) {
-				compareOne->name = to;
+			if(name == from) {
+				name = to;
 			}
+
+			compareOne->ReplaceTargetNameTo(from, to);
+			compareTwo->ReplaceTargetNameTo(from, to);
 		}
 
 		EXPR_OBJ() Clone() override {
@@ -824,11 +817,40 @@ struct AST {
 
 		DEFAULT_TOLLMASCALBEFORE()
 
-		DEFAULT_REPLACE_TARGET_NAME_TO()
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			condition->ReplaceTargetNameTo(from, to);
+
+			for(auto const& i : if_body) {
+
+				i->ReplaceTargetNameTo(from, to);
+			}
+
+			for(auto const& i : else_body) {
+
+				i->ReplaceTargetNameTo(from, to);
+			}
+		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || condition->name == str;
+			if(condition->ContainsName(str)) {
+				return true;
+			}
+
+			for(auto const& i : if_body) {
+				if(i->ContainsName(str)) {
+					return true;
+				}
+			}
+
+			for(auto const& i : else_body) {
+				if(i->ContainsName(str)) {
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		EXPR_OBJ() Clone() override {
