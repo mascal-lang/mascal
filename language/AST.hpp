@@ -746,6 +746,89 @@ struct AST {
 		}
 	};
 
+	struct While : public Expression {
+
+		EXPR_OBJ() condition;
+		EXPR_OBJ_VECTOR() loop_body;
+
+		While(EXPR_OBJ() condition_in, EXPR_OBJ_VECTOR() loop_body_in) {
+
+			condition = std::move(condition_in);
+			loop_body = std::move(loop_body_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			if(condition->ToLLMascalBefore() != "") {
+
+				res += condition->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			res += "while ";
+			
+			res += condition->ToLLMascal();
+			res += " do\n";
+
+			slash_t_count += 1;
+
+			for(auto const& i: loop_body) {
+				res += GetSlashT();
+				res += i->ToLLMascalBefore();
+				res += "\n";
+
+				res += GetSlashT();
+				res += i->ToLLMascal();
+				res += "\n";
+			}
+
+			slash_t_count -= 1;
+
+			res += GetSlashT() + "end;\n";
+			
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			condition->ReplaceTargetNameTo(from, to);
+
+			for(auto const& i : loop_body) {
+
+				i->ReplaceTargetNameTo(from, to);
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			if(condition->ContainsName(str)) {
+				return true;
+			}
+
+			for(auto const& i : loop_body) {
+				if(i->ContainsName(str)) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			CLONE_EXPR_VECTOR(loop_body, clone_loop_body);
+
+			return std::make_unique<While>(condition->Clone(), std::move(clone_loop_body));
+		}
+	};
+
 	struct If : public Expression {
 
 		EXPR_OBJ() condition;
@@ -1026,9 +1109,9 @@ struct AST {
 
 	static void SaveState(std::string name, llvm::BasicBlock* bb);
 	static void SetExistingState(std::string name, llvm::BasicBlock* bb);
+	static llvm::Value* FindExistingState(std::string name, llvm::BasicBlock* bb);
 
 	static void CreateIfPHIs(llvm::BasicBlock* continueBlock);
-
 	static void CreateIfElsePHIs(llvm::BasicBlock* continueBlock);
 };
 

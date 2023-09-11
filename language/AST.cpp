@@ -211,6 +211,74 @@ llvm::Value* AST::Compare::codegen() {
 	return comp;
 }
 
+llvm::Value* AST::While::codegen() {
+
+	llvm::Value* conditionCodegen = AST::GetOrCreateInstruction(condition.get());
+
+	llvm::Function *TheFunction = CodeGen::Builder->GetInsertBlock()->getParent();
+
+	llvm::BasicBlock* EntryBlock = CodeGen::Builder->GetInsertBlock();
+	llvm::BasicBlock* LoopBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "while", TheFunction);
+	llvm::BasicBlock* ContinueBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "continue");
+
+	CodeGen::Builder->CreateCondBr(conditionCodegen, LoopBlock, ContinueBlock);
+
+	CodeGen::Builder->SetInsertPoint(LoopBlock);
+
+	std::unordered_map<std::string, llvm::PHINode*> allPHIs;
+
+	for(auto const& i: loop_body) {
+
+		AST::SaveState(i->name, EntryBlock);
+
+		if(allPHIs.find(i->name) == allPHIs.end()) {
+
+			CodeGen::Builder->SetInsertPoint(LoopBlock, LoopBlock->begin());
+
+			auto entry = AST::FindExistingState(i->name, EntryBlock);
+
+			allPHIs[i->name] = CodeGen::Builder->CreatePHI(entry->getType(), 2, "phi");
+
+			allPHIs[i->name]->addIncoming(entry, LoopBlock);
+			allPHIs[i->name]->addIncoming(entry, EntryBlock);
+
+			CodeGen::Builder->SetInsertPoint(LoopBlock);
+
+			AST::AddInstruction(i.get(), allPHIs[i->name]);
+		}
+
+		auto t = i->codegen();
+
+		if(allPHIs.find(i->name) != allPHIs.end()) {
+			allPHIs[i->name]->setIncomingValue(0, t);
+		}
+	}
+
+	CodeGen::Builder->CreateCondBr(condition->codegen(), LoopBlock, ContinueBlock);
+
+	TheFunction->getBasicBlockList().push_back(ContinueBlock);
+	CodeGen::Builder->SetInsertPoint(ContinueBlock);
+
+	UNORDERED_MAP_FOREACH(std::string, llvm::PHINode*, allPHIs, it) {
+
+		auto firstVal = it->second->getIncomingValue(0);
+		auto secondVal = it->second->getIncomingValue(1);
+
+		auto finalPHI = CodeGen::Builder->CreatePHI(firstVal->getType(), 2, "phi");
+
+		finalPHI->addIncoming(firstVal, LoopBlock);
+		finalPHI->addIncoming(secondVal, EntryBlock);
+
+		AST::AddInstructionToName(it->first, finalPHI);
+	}
+
+	for(auto const& i: loop_body) {
+		AST::SaveState(i->name, ContinueBlock);
+	}
+
+	return nullptr;
+}
+
 llvm::Value* AST::If::codegen() {
 
 	llvm::Value* conditionCodegen = AST::GetOrCreateInstruction(condition.get());
@@ -283,7 +351,7 @@ llvm::Value* AST::If::codegen() {
 	TheFunction->getBasicBlockList().push_back(ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
-	AST::CreateIfElsePHIs(ContinueBlock);
+	AST::CreateIfPHIs(ContinueBlock);
 
 	for(auto const& i: if_body) {
 		AST::SaveState(i->name, ContinueBlock);
@@ -362,6 +430,20 @@ void AST::SetExistingState(std::string name, llvm::BasicBlock* bb) {
 			CodeGen::all_coms[name]->current = CodeGen::all_coms[name]->states[bbName];
 		}
 	}
+}
+
+llvm::Value* AST::FindExistingState(std::string name, llvm::BasicBlock* bb) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+	
+		std::string bbName = std::string(bb->getName());
+		if(CodeGen::all_coms[name]->states.find(bbName) != CodeGen::all_coms[name]->states.end()) {
+
+			return CodeGen::all_coms[name]->states[bbName];
+		}
+	}
+
+	return nullptr;
 }
 
 void AST::CreateIfPHIs(llvm::BasicBlock* continueBlock) {

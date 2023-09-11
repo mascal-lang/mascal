@@ -43,6 +43,9 @@ enum Token
 
 	IntCast = -22,
 	To = -23,
+
+	While = -24,
+	Do = -25,
 };
 
 enum LexerIsInside {
@@ -252,6 +255,9 @@ struct Lexer
 
 		else if(IsIdentifier("intcast")) return Token::IntCast;
 		else if(IsIdentifier("to")) return Token::To;
+
+		else if(IsIdentifier("while")) return Token::While;
+		else if(IsIdentifier("do")) return Token::Do;
 
 		return Token::Identifier;
 	}

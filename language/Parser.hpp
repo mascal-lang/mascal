@@ -563,6 +563,38 @@ struct Parser {
 		return std::make_unique<AST::IntCast>(MemTreatment(std::move(Expr)), std::move(ty));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseWhile() {
+
+		Lexer::GetNextToken();
+
+		auto Cond = ParseExpression();
+
+		if(Lexer::CurrentToken != Token::Do) {
+			ExprError("Expected 'do' keyword.");
+		}
+
+		Lexer::GetNextToken();
+
+		std::vector<std::unique_ptr<AST::Expression>> loop_body;
+
+		while(Lexer::CurrentToken != Token::End) {
+
+			std::unique_ptr<AST::Expression> e = ParseExpression();
+
+			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside while loop."); }
+
+			loop_body.push_back(std::move(e));
+
+			ResetMainTarget();
+
+			Lexer::GetNextToken();
+		}
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::While>(std::move(Cond), std::move(loop_body));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -586,6 +618,8 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::MemStore) { return ParseMemStore(); }
 
 		else if(Lexer::CurrentToken == Token::IntCast) { return ParseIntCast(); }
+
+		else if(Lexer::CurrentToken == Token::While) { return ParseWhile(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;

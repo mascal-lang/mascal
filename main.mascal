@@ -1,20 +1,10 @@
-proc addSomeBigNumber(com daNumber: i32): i32 begin
-	
-	daNumber += 100000;
-
-	if COMPARE.IsLessThanOrEquals(daNumber, 100000) then
-		return daNumber;
-	end;
-
-	return 10;
-end
-
 program begin
 
 	com firstCom: i32 = 0;
-	com daBigNumber: i32 = 10;
 
-	firstCom = addSomeBigNumber(daBigNumber);
+	while COMPARE.IsLessThan(firstCom, 10) do
+		firstCom += 1;
+	end;
 
 	return firstCom;
 
