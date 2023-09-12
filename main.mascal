@@ -1,11 +1,14 @@
 program begin
 
-	com firstCom: i32 = 0;
+	com x: i32 = 0;
+	com y: i32 = 0;
+	com z: i32 = 0;
 
-	while COMPARE.IsLessThan(firstCom, 10) do
-		firstCom += 1;
+	while COMPARE.IsLessThan(x, 1000) do
+		y += 10;
+		x += 1;
 	end;
 
-	return firstCom;
+	return y;
 
 end

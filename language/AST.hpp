@@ -1107,12 +1107,17 @@ struct AST {
 	static void AddInstruction(AST::Expression* e, llvm::Value* l);
 	static void AddInstructionToName(std::string name, llvm::Value* l);
 
+	static void GlobalSaveState(llvm::BasicBlock* bb);
+	
 	static void SaveState(std::string name, llvm::BasicBlock* bb);
 	static void SetExistingState(std::string name, llvm::BasicBlock* bb);
 	static llvm::Value* FindExistingState(std::string name, llvm::BasicBlock* bb);
 
 	static void CreateIfPHIs(llvm::BasicBlock* continueBlock);
 	static void CreateIfElsePHIs(llvm::BasicBlock* continueBlock);
+
+	static bool IsInitializer(AST::Expression* t);
+	static bool IsAlgorithm(AST::Expression* t);
 };
 
 #endif

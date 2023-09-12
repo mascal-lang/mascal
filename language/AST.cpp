@@ -20,6 +20,8 @@ llvm::Function* AST::Program::codegen() {
 		all_instructions[i]->codegen();
 	}
 
+	CodeGen::UpdateAllPHIPreds();
+
 	// mustprogress nofree norecurse nosync nounwind readnone willreturn
 
 	F->addFnAttr(llvm::Attribute::MustProgress);
@@ -211,6 +213,16 @@ llvm::Value* AST::Compare::codegen() {
 	return comp;
 }
 
+bool AST::IsInitializer(AST::Expression* t) {
+
+	return dynamic_cast<AST::Com*>(t) != nullptr || dynamic_cast<AST::Mem*>(t) != nullptr;
+}
+
+bool AST::IsAlgorithm(AST::Expression* t) {
+
+	return dynamic_cast<AST::If*>(t) != nullptr || dynamic_cast<AST::While*>(t) != nullptr;
+}
+
 llvm::Value* AST::While::codegen() {
 
 	llvm::Value* conditionCodegen = AST::GetOrCreateInstruction(condition.get());
@@ -227,30 +239,46 @@ llvm::Value* AST::While::codegen() {
 
 	std::unordered_map<std::string, llvm::PHINode*> allPHIs;
 
+	AST::GlobalSaveState(EntryBlock);
+	AST::GlobalSaveState(LoopBlock);
+
 	for(auto const& i: loop_body) {
 
 		AST::SaveState(i->name, EntryBlock);
 
-		if(allPHIs.find(i->name) == allPHIs.end()) {
+		bool isNotAVar = AST::IsInitializer(i.get()) || AST::IsAlgorithm(i.get());
 
-			CodeGen::Builder->SetInsertPoint(LoopBlock, LoopBlock->begin());
+		if(!isNotAVar) {
 
-			auto entry = AST::FindExistingState(i->name, EntryBlock);
+			if(allPHIs.find(i->name) == allPHIs.end()) {
 
-			allPHIs[i->name] = CodeGen::Builder->CreatePHI(entry->getType(), 2, "phi");
+				llvm::BasicBlock* currentBlock = CodeGen::Builder->GetInsertBlock();
+				
+				CodeGen::Builder->SetInsertPoint(LoopBlock, LoopBlock->begin());
+	
+				auto entry = AST::FindExistingState(i->name, EntryBlock);
+	
+				auto phi = CodeGen::Builder->CreatePHI(entry->getType(), 2, "phi");
+	
+				phi->addIncoming(entry, LoopBlock);
+				phi->addIncoming(entry, EntryBlock);
 
-			allPHIs[i->name]->addIncoming(entry, LoopBlock);
-			allPHIs[i->name]->addIncoming(entry, EntryBlock);
+				CodeGen::AddPHINodeToVec(phi);
 
-			CodeGen::Builder->SetInsertPoint(LoopBlock);
-
-			AST::AddInstruction(i.get(), allPHIs[i->name]);
+				allPHIs[i->name] = phi;
+	
+				CodeGen::Builder->SetInsertPoint(currentBlock);
+	
+				AST::AddInstruction(i.get(), allPHIs[i->name]);
+			}
 		}
 
 		auto t = i->codegen();
 
-		if(allPHIs.find(i->name) != allPHIs.end()) {
-			allPHIs[i->name]->setIncomingValue(0, t);
+		if(!isNotAVar) {
+			if(allPHIs.find(i->name) != allPHIs.end()) {
+				allPHIs[i->name]->setIncomingValue(0, t);
+			}
 		}
 	}
 
@@ -268,6 +296,8 @@ llvm::Value* AST::While::codegen() {
 
 		finalPHI->addIncoming(firstVal, LoopBlock);
 		finalPHI->addIncoming(secondVal, EntryBlock);
+
+		CodeGen::AddPHINodeToVec(finalPHI);
 
 		AST::AddInstructionToName(it->first, finalPHI);
 	}
@@ -367,15 +397,57 @@ llvm::Value* AST::GetCurrentInstruction(AST::Expression* e) {
 
 llvm::Value* AST::GetCurrentInstructionByName(std::string name) {
 
+	llvm::Value* res = nullptr;
+
 	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
-		return CodeGen::all_coms[name]->current;
+		res = CodeGen::all_coms[name]->current;
+	}
+	else if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
+		res = CodeGen::all_mems[name]->current;
 	}
 
-	if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
-		return CodeGen::all_mems[name]->current;
+	if(res == nullptr) {
+		return res;
 	}
 
-	return nullptr;
+	if(!isa<llvm::PHINode>(res)) {
+		return res;
+	}
+
+	llvm::PHINode* resPHI = dyn_cast<llvm::PHINode>(res);
+
+	llvm::BasicBlock* curBlock = CodeGen::Builder->GetInsertBlock();
+	llvm::BasicBlock* resBlock = resPHI->getParent();
+
+	if(resBlock == curBlock) {
+		return res;
+	}
+
+	std::vector<llvm::BasicBlock*> blockPreds;
+
+	for (auto it = llvm::pred_begin(curBlock), et = llvm::pred_end(curBlock); it != et; ++it)
+	{
+		llvm::BasicBlock* predecessor = *it;
+		blockPreds.push_back(predecessor);
+	}
+
+	auto newPhi = CodeGen::Builder->CreatePHI(res->getType(), 2, "phi");
+
+	auto findState = AST::FindExistingState(name, blockPreds[1]);
+
+	if(findState == nullptr) {
+		std::cout << "There's no '" << name << "' inside the block '" << std::string(blockPreds[1]->getName()) << "'.\n";
+		exit(1);
+	}
+
+	newPhi->addIncoming(res, blockPreds[0]);
+	newPhi->addIncoming(findState, blockPreds[1]);
+
+	CodeGen::AddPHINodeToVec(newPhi);
+
+	AST::AddInstructionToName(name, newPhi);
+
+	return newPhi;
 }
 
 llvm::Value* AST::GetOrCreateInstruction(AST::Expression* e) {
@@ -406,18 +478,26 @@ llvm::Value* AST::LLReturn::codegen() {
 	return CodeGen::Builder->CreateRet(AST::GetOrCreateInstruction(target.get()));
 }
 
-void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
+void AST::GlobalSaveState(llvm::BasicBlock* bb) {
 
-	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
-		
-		std::string bbName = std::string(bb->getName());
-		if(CodeGen::all_coms[name]->states.find(bbName) == CodeGen::all_coms[name]->states.end()) {
+	std::string bbName = std::string(bb->getName());
+	UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<LLVM_Com>, CodeGen::all_coms, it) {
 
-			CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
-
-			//std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
-		}
+		AST::SaveState(it->first, bb);
 	}
+}
+
+void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
+	
+	if(name == "" || bb == nullptr) {
+		return;
+	}
+
+	std::string bbName = std::string(bb->getName());
+
+	CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
+
+	std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
 }
 
 void AST::SetExistingState(std::string name, llvm::BasicBlock* bb) {
@@ -476,6 +556,8 @@ void AST::CreateIfPHIs(llvm::BasicBlock* continueBlock) {
 			phi->addIncoming(entryValue, blockPreds[1]);
 
 			it->second->current = phi;
+
+			CodeGen::AddPHINodeToVec(phi);
 		}
 	}
 }
@@ -526,6 +608,8 @@ void AST::CreateIfElsePHIs(llvm::BasicBlock* continueBlock) {
 			phi->addIncoming(ifValue, ifBlock);
 
 			it->second->current = phi;
+
+			CodeGen::AddPHINodeToVec(phi);
 		}
 		else if(it->second->states.find(bbPreds2) != it->second->states.end()) {
 			
@@ -538,6 +622,8 @@ void AST::CreateIfElsePHIs(llvm::BasicBlock* continueBlock) {
 			phi->addIncoming(ifValue, ifBlock);
 
 			it->second->current = phi;
+
+			CodeGen::AddPHINodeToVec(phi);
 		}
 		else {
 			//std::cout << "'" << bbPreds1 << "' (bbPreds1) and '" << bbPreds2 << "' (bbPreds2) not found!\n";

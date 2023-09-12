@@ -431,7 +431,7 @@ struct Parser {
 
 		int finalCompare = TextToCompareType(compareType);
 
-		return std::make_unique<AST::Compare>(std::move(CompareOne), std::move(CompareTwo), finalCompare);
+		return std::make_unique<AST::Compare>(MemTreatment(std::move(CompareOne)), MemTreatment(std::move(CompareTwo)), finalCompare);
 	}
 
 	static std::unique_ptr<AST::Expression> ParseIf(bool check_comma = true) {

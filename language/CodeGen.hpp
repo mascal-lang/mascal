@@ -71,6 +71,11 @@ struct CodeGen {
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> all_coms;
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> all_mems;
 
+	static std::vector<llvm::PHINode*> all_phi_nodes;
+
+	static void AddPHINodeToVec(llvm::PHINode* p);
+	static void UpdateAllPHIPreds();
+
 	static std::unique_ptr<llvm::LLVMContext> TheContext;
 	static std::unique_ptr<llvm::IRBuilder<>> Builder;
 	static std::unique_ptr<llvm::Module> TheModule;
