@@ -182,10 +182,15 @@ struct Parser {
 			Lexer::GetNextToken();
 		}
 
-		for(auto const& i: body_clone) {
+		bool isVoid = dynamic_cast<AST::Void*>(proc_copy->proc_type.get()) != nullptr;
 
-			if(i->ContainsName(name + "_return")) {
-				i->ReplaceTargetNameTo(name + "_return", name + "_return" + std::to_string(proc_copy->call_count));
+		if(!isVoid) {
+
+			for(auto const& i: body_clone) {
+
+				if(i->ContainsName(name + "_return")) {
+					i->ReplaceTargetNameTo(name + "_return", name + "_return" + std::to_string(proc_copy->call_count));
+				}
 			}
 		}
 
@@ -203,7 +208,16 @@ struct Parser {
 			}
 		}
 
-		return std::make_unique<AST::ProcedureCall>(std::move(body_clone), std::make_unique<AST::Variable>(name + "_return" + std::to_string(proc_copy->call_count)));
+		std::unique_ptr<AST::Expression> returnObj;
+
+		if(!isVoid) {
+			returnObj = std::make_unique<AST::Variable>(name + "_return" + std::to_string(proc_copy->call_count));
+		}
+		else {
+			returnObj = std::make_unique<AST::RetVoid>();
+		}
+
+		return std::make_unique<AST::ProcedureCall>(std::move(body_clone), std::move(returnObj));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseIdentifier() {
@@ -244,6 +258,8 @@ struct Parser {
 		else if(curr_ident == "i16") { return std::make_unique<AST::Integer16>(); }
 		else if(curr_ident == "i8") { return std::make_unique<AST::Integer8>(); }
 		else if(curr_ident == "i1" || curr_ident == "bool") { return std::make_unique<AST::Integer1>(); }
+
+		else if(curr_ident == "void") { return std::make_unique<AST::Void>(); }
 
 		ExprError("Unknown type found.");
 		return nullptr;
@@ -854,13 +870,26 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		if(Lexer::CurrentToken != ':') { ExprError("Expected ':' to specify procedure type."); }
+		std::unique_ptr<AST::Type> procType;
 
-		Lexer::GetNextToken();
+		if(Lexer::CurrentToken == ':') { 
 
-		auto procType = IdentStrToType();
+			Lexer::GetNextToken();
 
-		Lexer::GetNextToken();
+			procType = IdentStrToType();
+
+			Lexer::GetNextToken();
+		}
+		else if(Lexer::CurrentToken != Token::Begin) {
+			ExprError("Expected ':' to specify procedure type or 'begin' in procedure.");
+		}
+
+		bool isVoid = false;
+
+		if(procType == nullptr) {
+			isVoid = true;
+			procType = std::make_unique<AST::Void>();
+		}
 
 		auto proc = std::make_unique<AST::Procedure>(procName, all_argument_var_types, std::move(all_arguments), std::move(all_argument_types), std::move(procType));
 
@@ -874,11 +903,14 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		auto return_value = std::make_unique<AST::Com>(procName + "_return", newProc->proc_type->Clone(), std::make_unique<AST::IntNumber>(0, newProc->proc_type->Clone()));
+		if(!isVoid) {
 
-		AddParserCom(procName + "_return", return_value->ty.get());
+			auto return_value = std::make_unique<AST::Com>(procName + "_return", newProc->proc_type->Clone(), std::make_unique<AST::IntNumber>(0, newProc->proc_type->Clone()));
 
-		body.push_back(std::move(return_value));
+			AddParserCom(procName + "_return", return_value->ty.get());
+
+			body.push_back(std::move(return_value));
+		}
 
 		while (Lexer::CurrentToken != Token::End) { 
 

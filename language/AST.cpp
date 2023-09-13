@@ -44,6 +44,10 @@ llvm::Type* AST::Integer16::codegen() { return llvm::IntegerType::getInt16Ty(*Co
 llvm::Type* AST::Integer8::codegen() { return llvm::IntegerType::getInt8Ty(*CodeGen::TheContext); }
 llvm::Type* AST::Integer1::codegen() { return llvm::IntegerType::getInt1Ty(*CodeGen::TheContext); }
 
+llvm::Type* AST::Void::codegen() { return llvm::IntegerType::getVoidTy(*CodeGen::TheContext); }
+
+llvm::Value* AST::RetVoid::codegen() { return nullptr; }
+
 llvm::Value* AST::ProcedureCall::codegen() {
 
 	for(auto const& i: body) {

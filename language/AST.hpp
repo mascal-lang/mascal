@@ -21,6 +21,8 @@
 #define CLONE_TYPE_VECTOR(x, y) std::vector<std::unique_ptr<AST::Type>> y; for(auto const& i: x) { auto z = i->Clone(); y.push_back(std::move(z)); }
 #define CLONE_AST_CUSTOM_VECTOR(z, x, y) std::vector<std::unique_ptr<z>> y; for(auto const& i: x) { auto z = i->Clone(); y.push_back(std::move(z)); }
 
+#define EMPTY_TOLLMASCAL() std::string ToLLMascal() override { return ""; }
+
 #define DEFAULT_TOLLMASCALBEFORE() std::string ToLLMascalBefore() override { return ""; }
 
 #define DEFAULT_REPLACE_TARGET_NAME_TO() void ReplaceTargetNameTo(std::string from, std::string to) override { return; }
@@ -46,6 +48,8 @@ struct AST {
 	NEW_TYPE(Integer16, return "i16"; );
 	NEW_TYPE(Integer8, return "i8"; );
 	NEW_TYPE(Integer1, return "i1"; );
+
+	NEW_TYPE(Void, return "void"; );
 
 	static int slash_t_count;
 
@@ -274,6 +278,23 @@ struct AST {
 		EXPR_OBJ() Clone() override {
 
 			return std::make_unique<Mem>(name, ty->Clone(), target->Clone());
+		}
+	};
+
+	struct RetVoid : public Expression {
+
+		RetVoid() {}
+
+		llvm::Value* codegen() override;
+
+		EMPTY_TOLLMASCAL()
+		DEFAULT_TOLLMASCALBEFORE()
+		DEFAULT_REPLACE_TARGET_NAME_TO()
+		DEFAULT_CONTAINS_NAME()
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<RetVoid>();
 		}
 	};
 

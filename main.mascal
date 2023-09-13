@@ -1,13 +1,19 @@
+proc doTheWhileLoop(com a: i32, com b: i32) 
+begin
+	
+	while COMPARE.IsLessThan(a, 1000) do
+		b += 10;
+		a += 1;
+	end;
+end
+
 program begin
 
 	com x: i32 = 0;
 	com y: i32 = 0;
 	com z: i32 = 0;
 
-	while COMPARE.IsLessThan(x, 1000) do
-		y += 10;
-		x += 1;
-	end;
+	doTheWhileLoop(x, y);
 
 	return y;
 
