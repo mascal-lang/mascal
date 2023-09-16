@@ -1,0 +1,15 @@
+program begin
+	com x: i32 = 0;
+	com y: i32 = 0;
+	com z: i32 = 0;
+		while COMPARE.IsLessThan(x, 1000) do
+		
+		add y, 10;
+		
+		add x, 1;
+	end;
+
+
+	
+	llreturn y;
+end

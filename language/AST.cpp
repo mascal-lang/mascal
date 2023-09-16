@@ -501,7 +501,7 @@ void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
 
 	CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
 
-	std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
+	//std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
 }
 
 void AST::SetExistingState(std::string name, llvm::BasicBlock* bb) {
