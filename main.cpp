@@ -3,6 +3,8 @@
 #include "language/Parser.hpp"
 #include "language/CodeGen.hpp"
 
+#include "translators/Assembly/AssemblyMain.hpp"
+
 int main(int argc, char const *argv[])
 {
 	CodeGen::releaseMode = false;
@@ -32,6 +34,11 @@ int main(int argc, char const *argv[])
 			Lexer::Start();
 		
 			Parser::MainLoop();
+		}
+
+		if(cmd == "translate") {
+
+			AssemblyTR::Start("main.s");
 		}
 	}
 

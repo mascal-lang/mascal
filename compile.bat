@@ -11,8 +11,11 @@ set LLVMConfigResult=
 %LLVMConfigPath% --cxxflags --link-static --ldflags --system-libs --libs all > llvmconfig.txt
 for /f "delims=" %%x in (llvmconfig.txt) do set LLVMConfigResult=!LLVMConfigResult! %%x
 
+set MTCPPAssembly=translators/Assembly/*.cpp
+set MTCPPx86Assembly=translators/Assembly/X86/*.cpp
+
 echo Compiling Mascal on Windows...
-%ClangPath% -g -O3 language/*.cpp *.cpp %LLVMConfigResult% -fstack-protector -lssp -frtti -std=c++20 -static -o mascal
+%ClangPath% -g -O3 %MTCPPAssembly% %MTCPPx86Assembly% language/*.cpp *.cpp %LLVMConfigResult% -fstack-protector -lssp -frtti -std=c++20 -static -o mascal
 
 IF "%ERRORLEVEL%"=="0" (
     echo Mascal Compiled Successfully!
