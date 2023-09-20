@@ -12,6 +12,8 @@ struct X86AssemblyAST {
 
 		std::string name;
 
+		std::string asmType;
+
 		virtual ~Expression() = default;
 
 		virtual std::string codegen() = 0;
@@ -60,6 +62,21 @@ struct X86AssemblyAST {
 		std::string codegen() override;
 	};
 
+	struct RAM : public Expression {
+
+		std::string pointerName;
+		std::unique_ptr<Type> ty;
+
+		RAM(std::string name_in, std::string pointerName_in, std::unique_ptr<Type> ty_in) {
+
+			name = name_in;
+			pointerName = pointerName_in;
+			ty = std::move(ty_in);
+		}
+
+		std::string codegen() override;
+	};
+
 	struct Return : public Expression {
 
 		Return() {}
@@ -69,13 +86,21 @@ struct X86AssemblyAST {
 
 	struct Function : public Expression {
 
-		std::vector<std::unique_ptr<Expression>> initializers;
+		std::vector<std::unique_ptr<Expression>> registers;
+		std::vector<std::unique_ptr<RAM>> stack;
+
 		std::vector<std::unique_ptr<Expression>> instructions;
 
-		Function(std::string name_in, std::vector<std::unique_ptr<Expression>> instructions_in, std::vector<std::unique_ptr<Expression>> initializers_in) {
+		Function(std::string name_in, 
+			std::vector<std::unique_ptr<Expression>> instructions_in, 
+			std::vector<std::unique_ptr<Expression>> registers_in,
+			std::vector<std::unique_ptr<RAM>> stack_in) {
 
 			name = name_in;
-			initializers = std::move(initializers_in);
+
+			registers = std::move(registers_in);
+			stack = std::move(stack_in);
+
 			instructions = std::move(instructions_in);
 		}
 
@@ -87,10 +112,26 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> value;
 		std::unique_ptr<Expression> target;
 
-		Add(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
+		Add(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
+			asmType = type;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Sub : public Expression {
+
+		std::unique_ptr<Expression> value;
+		std::unique_ptr<Expression> target;
+
+		Sub(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
+
+			value = std::move(value_in);
+			target = std::move(target_in);
+			asmType = type;
 		}
 
 		std::string codegen() override;
@@ -101,10 +142,68 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> value;
 		std::unique_ptr<Expression> target;
 
-		Mov(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
+		bool isMem = false;
+
+		Mov(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type, bool isMem_in = false) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
+			isMem = isMem_in;
+			asmType = type;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Lea : public Expression {
+
+		std::unique_ptr<Expression> value;
+		std::unique_ptr<Expression> target;
+
+		Lea(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
+
+			value = std::move(value_in);
+			target = std::move(target_in);
+			asmType = type;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Push : public Expression {
+
+		std::unique_ptr<Expression> target;
+
+		Push(std::unique_ptr<Expression> target_in, std::string type) {
+
+			target = std::move(target_in);
+			asmType = type;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Pop : public Expression {
+
+		std::unique_ptr<Expression> target;
+
+		Pop(std::unique_ptr<Expression> target_in, std::string type) {
+
+			target = std::move(target_in);
+			asmType = type;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Call : public Expression {
+
+		std::unique_ptr<Expression> target;
+
+		Call(std::unique_ptr<Expression> target_in, std::string type) {
+
+			target = std::move(target_in);
+			asmType = type;
 		}
 
 		std::string codegen() override;

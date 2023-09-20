@@ -33,6 +33,18 @@ std::string X86AssemblyAST::Register::codegen() {
 	return res;
 }
 
+std::string X86AssemblyAST::RAM::codegen() {
+
+	std::string res = "mem ";
+
+	res += name;
+	res += ": ";
+	res += ty->codegen();
+	res += " = 0";
+
+	return res;
+}
+
 std::string X86AssemblyAST::Function::codegen() {
 
 	std::string res;
@@ -46,14 +58,23 @@ std::string X86AssemblyAST::Function::codegen() {
 		res += "() begin\n";
 	}
 
-	for(auto const& i : initializers) {
+	for(auto const& i : registers) {
 
+		res += "\t";
+		res += i->codegen();
+		res += ";\n";
+	}
+
+	for(auto const& i : stack) {
+
+		res += "\t";
 		res += i->codegen();
 		res += ";\n";
 	}
 
 	for(auto const& i : instructions) {
 
+		res += "\t";
 		res += i->codegen();
 		res += ";\n";
 	}
@@ -67,7 +88,31 @@ std::string X86AssemblyAST::Add::codegen() {
 
 	std::string res;
 
+	if(asmType == "Q") {
+		return "# 'addq' instruction not supported yet.";
+	}
+
 	res += "add ";
+	res += target->codegen();
+	res += ", ";
+	res += value->codegen();
+
+	return res;
+}
+
+std::string X86AssemblyAST::Sub::codegen() {
+
+	std::string res;
+
+	if(target->name == "rsp") {
+		return std::string("# [Assembly]: Reserve '") + value->codegen() + std::string("' bytes for local variables.");
+	}
+
+	if(asmType == "Q") {
+		return "# 'subq' instruction not supported yet.";
+	}
+
+	res += "sub ";
 	res += target->codegen();
 	res += ", ";
 	res += value->codegen();
@@ -79,10 +124,52 @@ std::string X86AssemblyAST::Mov::codegen() {
 
 	std::string res;
 
-	res += "comstore ";
+	if(asmType == "Q") {
+		return "# 'movq' instruction not supported yet.";
+	}
+
+	if(!isMem) {
+		res += "comstore ";
+	}
+	else {
+		res += "memstore ";
+	}
+
 	res += target->codegen();
 	res += ", ";
 	res += value->codegen();
 
 	return res;
+}
+
+std::string X86AssemblyAST::Lea::codegen() {
+
+	return "# 'lea' instructions not supported yet.";
+}
+
+std::string X86AssemblyAST::Push::codegen() {
+
+	if(target->name == "rbp") {
+		return "# [Assembly]: Initialize the Base Pointer.";
+	}
+
+	return "# 'push' instructions not supported yet.";
+}
+
+std::string X86AssemblyAST::Pop::codegen() {
+
+	if(target->name == "rbp") {
+		return "# [Assembly]: Pop the Base Pointer to close the program.";
+	}
+
+	return "# 'pop' instructions not supported yet.";
+}
+
+std::string X86AssemblyAST::Call::codegen() {
+
+	if(target->name == "__main") {
+		return "# [GCC/Clang/LLVM] Call to __main.";
+	}
+
+	return "# 'call' instructions not supported yet.";
 }

@@ -11,9 +11,19 @@ enum X86AssemblyToken {
 	X86Number = -3,
 
 	X86AddL = -4,
-	X86MovL = -5,
+	X86AddQ = -5,
 
-	X86Return = -6,
+	X86MovL = -6,
+
+	X86Return = -7,
+
+	X86PushQ = -8,
+	X86SubQ = -9,
+	X86LeaQ = -10,
+	X86CallQ = -11,
+
+	X86PopQ = -12,
+	
 };
 
 struct X86AssemblyLexer {
@@ -77,9 +87,9 @@ struct X86AssemblyLexer {
 
 		while (isspace(LastChar)) LastChar = Advance();
 
-		if(isalpha(LastChar) || LastChar == '%') return GetIdentifier();
+		if(isalpha(LastChar) || LastChar == '%' || LastChar == '_') return GetIdentifier();
 
-		if(isdigit(LastChar) || LastChar == '$') return GetNumber();
+		if(isdigit(LastChar) || LastChar == '$' || LastChar == '-') return GetNumber();
 
 		if (LastChar == '#')
 		{
@@ -128,9 +138,16 @@ struct X86AssemblyLexer {
 		}
 
 		if(IsIdentifier("addl")) return X86AssemblyToken::X86AddL;
-		else if(IsIdentifier("movl")) return X86AssemblyToken::X86MovL;
 
+		else if(IsIdentifier("addq")) return X86AssemblyToken::X86AddQ;
+		else if(IsIdentifier("subq")) return X86AssemblyToken::X86SubQ;
+		else if(IsIdentifier("leaq")) return X86AssemblyToken::X86LeaQ;
+		else if(IsIdentifier("callq")) return X86AssemblyToken::X86CallQ;
+		else if(IsIdentifier("popq")) return X86AssemblyToken::X86PopQ;
+		else if(IsIdentifier("pushq")) return X86AssemblyToken::X86PushQ;
 		else if(IsIdentifier("retq")) return X86AssemblyToken::X86Return;
+
+		else if(IsIdentifier("movl")) return X86AssemblyToken::X86MovL;
 
 		return X86AssemblyToken::X86Identifier;
 	}

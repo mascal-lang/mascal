@@ -9,6 +9,7 @@
 struct X86AssemblyParser {
 
 	static std::vector<std::unique_ptr<X86AssemblyAST::Expression>> astRegisters;
+	static std::vector<std::unique_ptr<X86AssemblyAST::RAM>> stackMemory;
 
 	static void AddRegister(std::string name) {
 
@@ -24,11 +25,76 @@ struct X86AssemblyParser {
 		astRegisters.push_back(std::move(Reg));
 	}
 
+	static void AddStackMemory(std::string pointerName) {
+
+		for(auto const& i : stackMemory) {
+
+			if(i->pointerName == pointerName) {
+				return;
+			}
+		}
+
+		std::string stackName = std::string("stackMemory") + std::to_string(stackMemory.size());
+		auto sMem = std::make_unique<X86AssemblyAST::RAM>(stackName, pointerName, std::make_unique<X86AssemblyAST::I32>());
+
+		stackMemory.push_back(std::move(sMem));
+	}
+
+	static std::string GetStackMemoryName(std::string pointerName) {
+
+		for(auto const& i : stackMemory) {
+
+			if(i->pointerName == pointerName) {
+				return i->name;
+			}
+		}
+
+		return "";
+	}
+
+	static bool StackMemoryExists(std::string name) {
+
+		for(auto const& i : stackMemory) {
+
+			if(i->name == name) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseNumber() {
 
 		X86AssemblyLexer::GetNextToken();
 
-		X86AssemblyLexer::NumValString.erase(0, 1);
+		if(X86AssemblyLexer::NumValString[0] == '$') {
+			X86AssemblyLexer::NumValString.erase(0, 1);
+		}
+
+		if(X86AssemblyLexer::CurrentToken == '(') {
+
+			X86AssemblyLexer::GetNextToken();
+
+			std::string pointerName = X86AssemblyLexer::NumValString + "(%rbp)";
+
+			if(X86AssemblyLexer::IdentifierStr == "%rbp") {
+				AddStackMemory(pointerName);
+			}
+
+			X86AssemblyLexer::GetNextToken();
+
+			if(X86AssemblyLexer::CurrentToken != ')') {
+
+				std::cout << "Expected ')'.\n";
+				exit(1);
+				return nullptr;
+			}
+
+			X86AssemblyLexer::GetNextToken();
+
+			return std::make_unique<X86AssemblyAST::Variable>(GetStackMemoryName(pointerName));
+		}
 
 		return std::make_unique<X86AssemblyAST::IntNumber>(std::stoi(X86AssemblyLexer::NumValString));
 	}
@@ -50,7 +116,7 @@ struct X86AssemblyParser {
 			}
 		}
 
-		return std::make_unique<X86AssemblyAST::Function>(name, std::move(allInstructions), std::move(astRegisters));
+		return std::make_unique<X86AssemblyAST::Function>(name, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseIdentifier() {
@@ -59,6 +125,7 @@ struct X86AssemblyParser {
 
 		if(idName[0] == '%') {
 			idName.erase(0, 1);
+			AddRegister(idName);
 		}
 
 		X86AssemblyLexer::GetNextToken();
@@ -66,8 +133,6 @@ struct X86AssemblyParser {
 		if(X86AssemblyLexer::CurrentToken == ':') {
 			return ParseFunction(idName);
 		}
-
-		AddRegister(idName);
 
 		return std::make_unique<X86AssemblyAST::Variable>(idName);
 	}
@@ -79,7 +144,7 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::Return>();
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseAdd() {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseAdd(std::string type) {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -93,10 +158,10 @@ struct X86AssemblyParser {
 
 		auto Two = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Add>(std::move(One), std::move(Two));
+		return std::make_unique<X86AssemblyAST::Add>(std::move(One), std::move(Two), type);
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov() {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSub(std::string type) {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -110,7 +175,70 @@ struct X86AssemblyParser {
 
 		auto Two = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Mov>(std::move(One), std::move(Two));
+		return std::make_unique<X86AssemblyAST::Sub>(std::move(One), std::move(Two), type);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto One = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in Assembly file.\n";
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Two = ParseExpression();
+
+		bool isMem = StackMemoryExists(Two->name);
+
+		return std::make_unique<X86AssemblyAST::Mov>(std::move(One), std::move(Two), type, isMem);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseLea(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto One = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in Assembly file.\n";
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Two = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Lea>(std::move(One), std::move(Two), type);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParsePush(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Expr = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Push>(std::move(Expr), type);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParsePop(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Expr = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Pop>(std::move(Expr), type);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseCall(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Expr = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Call>(std::move(Expr), type);
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
@@ -118,8 +246,16 @@ struct X86AssemblyParser {
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Return) { return ParseReturn(); }
 
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd(); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
+
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddQ) { return ParseAdd("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SubQ) { return ParseSub("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86LeaQ) { return ParseLea("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86PushQ) { return ParsePush("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86PopQ) { return ParsePop("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CallQ) { return ParseCall("Q"); }
+
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Number) { return ParseNumber(); }
 
