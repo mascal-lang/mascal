@@ -96,11 +96,31 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::Add>(std::move(One), std::move(Two));
 	}
 
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto One = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in Assembly file.\n";
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Two = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Mov>(std::move(One), std::move(Two));
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
 
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Return) { return ParseReturn(); }
+
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov(); }
+
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Number) { return ParseNumber(); }
 
 		std::cout << "Unknown token or identifier found.\n";

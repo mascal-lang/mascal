@@ -11,8 +11,9 @@ enum X86AssemblyToken {
 	X86Number = -3,
 
 	X86AddL = -4,
+	X86MovL = -5,
 
-	X86Return = -5,
+	X86Return = -6,
 };
 
 struct X86AssemblyLexer {
@@ -80,6 +81,18 @@ struct X86AssemblyLexer {
 
 		if(isdigit(LastChar) || LastChar == '$') return GetNumber();
 
+		if (LastChar == '#')
+		{
+			// Comment until end of line.
+			do
+			{
+				LastChar = Advance();
+			}
+			while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
+
+			if (LastChar != EOF) return GetToken();
+		}
+
 		if (LastChar == EOF) return X86AssemblyToken::X86EndOfFile;
 
 		int ThisChar = LastChar;
@@ -115,6 +128,8 @@ struct X86AssemblyLexer {
 		}
 
 		if(IsIdentifier("addl")) return X86AssemblyToken::X86AddL;
+		else if(IsIdentifier("movl")) return X86AssemblyToken::X86MovL;
+
 		else if(IsIdentifier("retq")) return X86AssemblyToken::X86Return;
 
 		return X86AssemblyToken::X86Identifier;

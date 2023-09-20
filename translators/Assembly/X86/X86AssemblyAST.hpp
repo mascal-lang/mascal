@@ -95,6 +95,20 @@ struct X86AssemblyAST {
 
 		std::string codegen() override;
 	};
+
+	struct Mov : public Expression {
+
+		std::unique_ptr<Expression> value;
+		std::unique_ptr<Expression> target;
+
+		Mov(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
+
+			value = std::move(value_in);
+			target = std::move(target_in);
+		}
+
+		std::string codegen() override;
+	};
 };
 
 #endif

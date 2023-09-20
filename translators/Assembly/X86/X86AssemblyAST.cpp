@@ -74,3 +74,15 @@ std::string X86AssemblyAST::Add::codegen() {
 
 	return res;
 }
+
+std::string X86AssemblyAST::Mov::codegen() {
+
+	std::string res;
+
+	res += "comstore ";
+	res += target->codegen();
+	res += ", ";
+	res += value->codegen();
+
+	return res;
+}
