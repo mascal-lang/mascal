@@ -173,3 +173,59 @@ std::string X86AssemblyAST::Call::codegen() {
 
 	return "# 'call' instructions not supported yet.";
 }
+
+std::string X86AssemblyAST::Comment::codegen() {
+
+	std::string comment = "# ";
+	comment += message;
+	return comment;
+}
+
+std::string X86AssemblyAST::Def::codegen() {
+
+	std::string res = "# [Assembly] Added new definition '";
+
+	res += name;
+	res += "':\n";
+
+	res += "#	.scl = ";
+	res += std::to_string(scl);
+	res += "\n";
+
+	res += "#	.type = ";
+	res += std::to_string(ty);
+
+	return res;
+}
+
+std::string X86AssemblyAST::Set::codegen() {
+
+	std::string res = "# [Assembly] Set '";
+	
+	res += name;
+	res += "' to '";
+	res += target->codegen();
+	res += "'.";
+
+	return res;
+}
+
+std::string X86AssemblyAST::File::codegen() {
+
+	std::string res = "# [Assembly] Filename: \"";
+	res += name;
+	res += "\".";
+
+	return res;
+}
+
+std::string X86AssemblyAST::P2Align::codegen() {
+
+	std::string res = "# [Assembly] P2Align Set (";
+	res += std::to_string(bytes);
+	res += ", ";
+	res += std::to_string(limit);
+	res += ").";
+
+	return res;
+}

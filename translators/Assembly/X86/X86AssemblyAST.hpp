@@ -208,6 +208,70 @@ struct X86AssemblyAST {
 
 		std::string codegen() override;
 	};
+
+	struct Comment : public Expression {
+
+		std::string message;
+
+		Comment(std::string message_in) {
+
+			message = message_in;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Def : public Expression {
+
+		int scl;
+		int ty;
+
+		Def(std::string name_in, int scl_in, int ty_in) {
+
+			name = name_in;
+			scl = scl_in;
+			ty = ty_in;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct Set : public Expression {
+
+		std::unique_ptr<Expression> target;
+
+		Set(std::string name_in, std::unique_ptr<Expression> target_in) {
+
+			name = name_in;
+			target = std::move(target_in);
+		}
+
+		std::string codegen() override;
+	};
+
+	struct File : public Expression {
+
+		File(std::string fileName_in) {
+
+			name = fileName_in;
+		}
+
+		std::string codegen() override;
+	};
+
+	struct P2Align : public Expression {
+
+		int bytes;
+		int limit;
+
+		P2Align(int bytes_in, int limit_in) {
+
+			bytes = bytes_in;
+			limit = limit_in;
+		}
+
+		std::string codegen() override;
+	};
 };
 
 #endif

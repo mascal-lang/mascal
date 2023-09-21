@@ -241,12 +241,167 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::Call>(std::move(Expr), type);
 	}
 
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseText() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::Comment>("[Assembly] Begin of .text section.");
+	}
+
+	static int GetDefScl() {
+
+		if(X86AssemblyLexer::IdentifierStr != ".scl") {
+			std::cout << "Expected '.scl'.\n";
+			exit(1);
+			return 0;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		int sclNum = std::stoi(X86AssemblyLexer::NumValString);
+
+		X86AssemblyLexer::GetNextToken();
+
+		if(X86AssemblyLexer::CurrentToken != ';') {
+			std::cout << "Expected ';' to end '.scl'.\n";
+			exit(1);
+			return 0;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		return sclNum;
+	}
+
+	static int GetDefType() {
+
+		if(X86AssemblyLexer::IdentifierStr != ".type") {
+			std::cout << "Expected '.type'.\n";
+			exit(1);
+			return 0;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		int typeNum = std::stoi(X86AssemblyLexer::NumValString);
+
+		X86AssemblyLexer::GetNextToken();
+
+		if(X86AssemblyLexer::CurrentToken != ';') {
+			std::cout << "Expected ';' to end '.type'.\n";
+			exit(1);
+			return 0;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		return typeNum;
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseDef() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string defineName = X86AssemblyLexer::IdentifierStr;
+
+		X86AssemblyLexer::GetNextToken();
+
+		if(X86AssemblyLexer::CurrentToken != ';') {
+			std::cout << "Expected ';'.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		int scl = GetDefScl();
+		int ty = GetDefType();
+
+		if(X86AssemblyLexer::IdentifierStr != ".endef") {
+			std::cout << "Expected '.endef' to close Assembly definition.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::Def>(defineName, scl, ty);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseGlobl() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string defName = X86AssemblyLexer::IdentifierStr;
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string msg = "[Assembly] Set definition '";
+		msg += defName;
+		msg += "' as Global for the Linker.";
+
+		return std::make_unique<X86AssemblyAST::Comment>(msg);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSet() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string defName = X86AssemblyLexer::IdentifierStr;
+
+		X86AssemblyLexer::GetNextToken();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in '.set'\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Expr = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Set>(defName, std::move(Expr));
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseFile() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string fileName = X86AssemblyLexer::StringString;
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::File>(fileName);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseP2Align() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		int bytes = std::stoi(X86AssemblyLexer::NumValString);
+
+		X86AssemblyLexer::GetNextToken();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' to split p2align/align arguments.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		int limit = std::stoi(X86AssemblyLexer::NumValString);
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::P2Align>(bytes, limit);
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
 
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Return) { return ParseReturn(); }
-
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddQ) { return ParseAdd("Q"); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SubQ) { return ParseSub("Q"); }
@@ -255,8 +410,15 @@ struct X86AssemblyParser {
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86PopQ) { return ParsePop("Q"); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CallQ) { return ParseCall("Q"); }
 
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
 
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Text) { return ParseText(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Def) { return ParseDef(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Globl) { return ParseGlobl(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Set) { return ParseSet(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86File) { return ParseFile(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86P2Align) { return ParseP2Align(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Number) { return ParseNumber(); }
 
 		std::cout << "Unknown token or identifier found.\n";
@@ -269,20 +431,23 @@ struct X86AssemblyParser {
 
 		auto Expr = ParseExpression();
 
+		std::string res = "";
+
 		if(Expr != nullptr) {
-			return Expr->codegen();
+			res += Expr->codegen();
+			res += "\n";
 		}
 
-		return "";
+		return res;
 	}
 
 	static std::string MainLoop() {
 
 		std::string result;
 
-		while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile) {
+		X86AssemblyLexer::GetNextToken();
 
-			X86AssemblyLexer::GetNextToken();
+		while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile) {
 
 			if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86EndOfFile) { break; }
 

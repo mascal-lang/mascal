@@ -10,3 +10,4 @@ int X86AssemblyLexer::Column;
 std::string X86AssemblyLexer::line_as_string;
 int X86AssemblyLexer::LastChar;
 std::vector<std::string> X86AssemblyLexer::all_lines_vector;
+std::string X86AssemblyLexer::StringString;

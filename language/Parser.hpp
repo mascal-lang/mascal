@@ -367,7 +367,7 @@ struct Parser {
 
 		std::unique_ptr<AST::Expression> value = ParseExpression();
 
-		return std::make_unique<AST::Add>(std::move(target), std::move(value));
+		return std::make_unique<AST::Add>(std::move(target), MemTreatment(std::move(value)));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseSub() {
@@ -384,7 +384,7 @@ struct Parser {
 
 		std::unique_ptr<AST::Expression> value = ParseExpression();
 
-		return std::make_unique<AST::Sub>(std::move(target), std::move(value));
+		return std::make_unique<AST::Sub>(std::move(target), MemTreatment(std::move(value)));
 	}
 
 	static int TextToCompareType(std::string t) {
