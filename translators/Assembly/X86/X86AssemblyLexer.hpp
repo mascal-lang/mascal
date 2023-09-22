@@ -177,9 +177,19 @@ struct X86AssemblyLexer {
 		else if(IsIdentifier(".file")) return X86AssemblyToken::X86File;
 		else if(IsIdentifier(".p2align")) return X86AssemblyToken::X86P2Align;
 
-		else if(IsIdentifier(".seh_setframe")) return X86AssemblyToken::X86SEHSetFrame;
-		else if(IdentifierContains(".seh")) return X86AssemblyToken::X86SEH;
-		else if(IdentifierContains(".seh_end")) return X86AssemblyToken::X86SEHEnd;
+		else if(IsIdentifier(".seh_setframe")) { 
+			return X86AssemblyToken::X86SEHSetFrame; 
+		}
+
+		else if(IsIdentifier(".seh_proc") || 
+			IsIdentifier(".seh_pushreg") ||
+			IsIdentifier(".seh_stackalloc")) { 
+			return X86AssemblyToken::X86SEH; 
+		}
+
+		else if(IdentifierContains(".seh_endprologue") || IsIdentifier(".seh_endproc")) { 
+			return X86AssemblyToken::X86SEHEnd; 
+		}
 
 		return X86AssemblyToken::X86Identifier;
 	}
