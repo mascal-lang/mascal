@@ -9,3 +9,5 @@ std::unordered_map<std::string, std::unique_ptr<Parser_Mem>> Parser::all_parser_
 std::vector<std::unique_ptr<AST::Procedure>> Parser::all_procedures;
 
 std::string Parser::current_procedure_name;
+
+AST::Attributes Parser::currentAttributes;

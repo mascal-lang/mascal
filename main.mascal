@@ -1,4 +1,4 @@
-program begin
+program [StackProtected] begin
 
 	mem x: i32 = 0;
 	mem y: i32 = 6;

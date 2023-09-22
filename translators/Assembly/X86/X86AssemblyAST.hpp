@@ -84,6 +84,33 @@ struct X86AssemblyAST {
 		std::string codegen() override;
 	};
 
+	struct Attributes {
+
+		bool isStackProtected = false;
+
+		bool IsEverythingDisabled() {
+
+			return !isStackProtected;
+		}
+
+		std::string codegen() {
+
+			std::string res = "";
+
+			if(!IsEverythingDisabled()) {
+				res += "[";
+			}
+
+			if(isStackProtected) { res += "StackProtected"; }
+
+			if(!IsEverythingDisabled()) {
+				res += "]";
+			}
+
+			return res;
+		}
+	};
+
 	struct Function : public Expression {
 
 		std::vector<std::unique_ptr<Expression>> registers;
@@ -91,12 +118,16 @@ struct X86AssemblyAST {
 
 		std::vector<std::unique_ptr<Expression>> instructions;
 
-		Function(std::string name_in, 
+		Attributes attrs;
+
+		Function(std::string name_in, Attributes attrs_in,
 			std::vector<std::unique_ptr<Expression>> instructions_in, 
 			std::vector<std::unique_ptr<Expression>> registers_in,
 			std::vector<std::unique_ptr<RAM>> stack_in) {
 
 			name = name_in;
+
+			attrs = attrs_in;
 
 			registers = std::move(registers_in);
 			stack = std::move(stack_in);
@@ -272,6 +303,19 @@ struct X86AssemblyAST {
 
 		std::string codegen() override;
 	};
+
+	struct EnableSEH : public Expression {
+
+		EnableSEH() {}
+
+		std::string codegen() override {
+			return "";
+		}
+	};
+
+	static bool IsSEH(Expression* expr) {
+		return dynamic_cast<EnableSEH*>(expr) != nullptr;
+	}
 };
 
 #endif

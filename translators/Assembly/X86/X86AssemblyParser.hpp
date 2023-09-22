@@ -105,18 +105,25 @@ struct X86AssemblyParser {
 
 		std::vector<std::unique_ptr<X86AssemblyAST::Expression>> allInstructions;
 
+		X86AssemblyAST::Attributes attrs;
+
 		while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile) {
 
 			auto Expr = ParseExpression();
 
-			allInstructions.push_back(std::move(Expr));
+			if(X86AssemblyAST::IsSEH(Expr.get())) {
+				attrs.isStackProtected = true;
+			}
+			else {
+				allInstructions.push_back(std::move(Expr));
+			}
 
 			if(dynamic_cast<X86AssemblyAST::Return*>(Expr.get())) {
 				break;
 			}
 		}
 
-		return std::make_unique<X86AssemblyAST::Function>(name, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
+		return std::make_unique<X86AssemblyAST::Function>(name, attrs, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseIdentifier() {
@@ -398,6 +405,44 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::P2Align>(bytes, limit);
 	}
 
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSEH() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::EnableSEH>();
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSEHEnd() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::EnableSEH>();
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSEHSetFrame() {
+
+		// Skip '.seh_setframe'
+		X86AssemblyLexer::GetNextToken();
+
+		auto Reg = ParseExpression();
+
+		// Check for the comma just in case.
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in '.seh_setframe'.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		// Skip the comma if it exists.
+		X86AssemblyLexer::GetNextToken();
+
+		auto Bytes = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::EnableSEH>();
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
 
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
@@ -420,6 +465,10 @@ struct X86AssemblyParser {
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86File) { return ParseFile(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86P2Align) { return ParseP2Align(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Number) { return ParseNumber(); }
+
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SEH) { return ParseSEH(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SEHEnd) { return ParseSEHEnd(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SEHSetFrame) { return ParseSEHSetFrame(); }
 
 		std::cout << "Unknown token or identifier found.\n";
 		exit(1);

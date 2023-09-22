@@ -28,7 +28,11 @@ llvm::Function* AST::Program::codegen() {
 	F->addFnAttr(llvm::Attribute::NoFree);
 	F->addFnAttr(llvm::Attribute::NoRecurse);
 	F->addFnAttr(llvm::Attribute::NoSync);
-	F->addFnAttr(llvm::Attribute::NoUnwind);
+
+	if(!attrs.isStackProtected) {
+		F->addFnAttr(llvm::Attribute::NoUnwind);
+	}
+
 	F->addFnAttr(llvm::Attribute::ReadNone);
 	F->addFnAttr(llvm::Attribute::WillReturn);
 

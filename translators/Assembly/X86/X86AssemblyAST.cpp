@@ -50,10 +50,14 @@ std::string X86AssemblyAST::Function::codegen() {
 	std::string res;
 
 	if(name == "main") {
-		res += "program begin\n";
+		res += "program ";
+		res += attrs.codegen();
+		res += " begin\n";
 	}
 	else {
 		res += "proc ";
+		res += attrs.codegen();
+		res += " ";
 		res += name;
 		res += "() begin\n";
 	}

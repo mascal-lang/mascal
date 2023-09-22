@@ -1080,11 +1080,18 @@ struct AST {
 		llvm::Value* codegen();
 	};
 
+	struct Attributes {
+
+		bool isStackProtected = false;
+	};
+
 	struct Program {
 
 		EXPR_OBJ_VECTOR() all_instructions;
 
-		Program(EXPR_OBJ_VECTOR() all_instructions) : all_instructions(std::move(all_instructions)) {}
+		Attributes attrs;
+
+		Program(EXPR_OBJ_VECTOR() all_instructions, Attributes attrs) : all_instructions(std::move(all_instructions)), attrs(attrs) {}
 
 		llvm::Function* codegen();
 

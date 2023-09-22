@@ -28,6 +28,8 @@ struct Parser {
 	static std::unordered_map<std::string, AST::Type*> all_parser_coms;
 	static std::unordered_map<std::string, std::unique_ptr<Parser_Mem>> all_parser_mems;
 
+	static AST::Attributes currentAttributes;
+
 	static void AddParserCom(std::string name, AST::Type* t) {
 
 		all_parser_coms[name] = t;
@@ -787,9 +789,44 @@ struct Parser {
 		return ParseBinaryOperator(std::move(P));
 	}
 
+	static AST::Attributes ParseAttributes() {
+
+		Lexer::GetNextToken();
+
+		AST::Attributes attrs;
+
+		while(Lexer::CurrentToken != ']') {
+
+			if(Lexer::IsIdentifier("StackProtected")) {
+				attrs.isStackProtected = true;
+			}
+
+			Lexer::GetNextToken();
+
+			if(Lexer::CurrentToken == ']') {
+				break;
+			}
+			else if(Lexer::CurrentToken != ',') {
+				ExprError("Expected ',' to split attributes or ']' to close them.");
+			}
+
+			Lexer::GetNextToken();
+		}
+
+		if(Lexer::CurrentToken == ']') {
+			Lexer::GetNextToken();
+		}
+
+		return attrs;
+	}
+
 	static std::unique_ptr<AST::Program> ParseProgram() {
 
 		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken == '[') {
+			Parser::currentAttributes = ParseAttributes();
+		}
 
 		if(Lexer::CurrentToken != Token::Begin) { ExprError("'begin' keyword not found."); }
 
@@ -810,7 +847,7 @@ struct Parser {
 			Lexer::GetNextToken();
 		}
 
-		return std::make_unique<AST::Program>(std::move(all_instructions));
+		return std::make_unique<AST::Program>(std::move(all_instructions), Parser::currentAttributes);
 	}
 
 	static std::unique_ptr<AST::Procedure> ParseProcedure() {

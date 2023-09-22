@@ -33,6 +33,10 @@ enum X86AssemblyToken {
 	X86P2Align = -18,
 
 	X86String = -19,
+
+	X86SEH = -20,
+	X86SEHEnd = -21,
+	X86SEHSetFrame = -22,
 };
 
 struct X86AssemblyLexer {
@@ -135,6 +139,11 @@ struct X86AssemblyLexer {
 		return IdentifierStr == s;
 	}
 
+	static bool IdentifierContains(std::string s) {
+
+		return IdentifierStr.find(s) != std::string::npos;
+	}
+
 	static bool is_still_identifier(char c)
 	{
 		return isalnum(c) || c == '_' || c == '.';
@@ -167,6 +176,10 @@ struct X86AssemblyLexer {
 		else if(IsIdentifier(".set")) return X86AssemblyToken::X86Set;
 		else if(IsIdentifier(".file")) return X86AssemblyToken::X86File;
 		else if(IsIdentifier(".p2align")) return X86AssemblyToken::X86P2Align;
+
+		else if(IsIdentifier(".seh_setframe")) return X86AssemblyToken::X86SEHSetFrame;
+		else if(IdentifierContains(".seh")) return X86AssemblyToken::X86SEH;
+		else if(IdentifierContains(".seh_end")) return X86AssemblyToken::X86SEHEnd;
 
 		return X86AssemblyToken::X86Identifier;
 	}
