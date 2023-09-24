@@ -87,10 +87,11 @@ struct X86AssemblyAST {
 	struct Attributes {
 
 		bool isStackProtected = false;
+		bool usesCStdLib = false;
 
 		bool IsEverythingDisabled() {
 
-			return !isStackProtected;
+			return !isStackProtected && !usesCStdLib;
 		}
 
 		std::string codegen() {
@@ -101,10 +102,11 @@ struct X86AssemblyAST {
 				res += "[";
 			}
 
-			if(isStackProtected) { res += "StackProtected"; }
+			if(isStackProtected) { res += " StackProtected"; }
+			if(usesCStdLib) { res += " CStdLib"; }
 
 			if(!IsEverythingDisabled()) {
-				res += "]";
+				res += " ]";
 			}
 
 			return res;
@@ -312,6 +314,19 @@ struct X86AssemblyAST {
 			return "";
 		}
 	};
+
+	struct EnableStdLib : public Expression {
+
+		EnableStdLib() {}
+
+		std::string codegen() override {
+			return "";
+		}
+	};
+
+	static bool UsesCStdLib(Expression* expr) {
+		return dynamic_cast<EnableStdLib*>(expr) != nullptr;
+	}
 
 	static bool IsSEH(Expression* expr) {
 		return dynamic_cast<EnableSEH*>(expr) != nullptr;

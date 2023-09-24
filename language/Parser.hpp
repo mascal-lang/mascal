@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include "Lexer.hpp"
 #include "AST.hpp"
+#include "../utils/DeleteGCCMainCall.hpp"
 
 struct Parser_Mem {
 
@@ -801,13 +802,8 @@ struct Parser {
 				attrs.isStackProtected = true;
 			}
 
-			Lexer::GetNextToken();
-
-			if(Lexer::CurrentToken == ']') {
-				break;
-			}
-			else if(Lexer::CurrentToken != ',') {
-				ExprError("Expected ',' to split attributes or ']' to close them.");
+			if(Lexer::IsIdentifier("CStdLib")) {
+				attrs.usesCStdLib = true;
 			}
 
 			Lexer::GetNextToken();
@@ -969,7 +965,7 @@ struct Parser {
 		return newProc;
 	}
 
-	static void HandleProgram() {
+	static std::unique_ptr<AST::Program> HandleProgram() {
 
 		Lexer::isInside = LexerIsInside::AProgram;
 
@@ -980,9 +976,7 @@ struct Parser {
   		myfile << program->ToLLMascal();
   		myfile.close();
 
-		program->codegen();
-
-		CodeGen::TheModule->print(llvm::outs(), nullptr);
+  		return program;
 	}
 
 	static void HandleProcedure() {
@@ -992,18 +986,60 @@ struct Parser {
 		all_procedures.push_back(std::move(proc));
 	}
 
-	static void MainLoop() {
+	static void MainLoop(bool build = false) {
 
 		StartMainTargetSystem();
+
+		std::unique_ptr<AST::Program> MainProgram = nullptr;
 
 		while (Lexer::CurrentToken != Token::EndOfFile) {
 
 			Lexer::GetNextToken();
 
 			if (Lexer::CurrentToken == Token::EndOfFile) 	break;
-			if (Lexer::CurrentToken == Token::Program) 		HandleProgram();
+			if (Lexer::CurrentToken == Token::Program) 		MainProgram = std::move(HandleProgram());
 			if (Lexer::CurrentToken == Token::Procedure) 	HandleProcedure();
 		}
+
+		MainProgram->codegen();
+
+		if(build) {
+
+			std::error_code EC;
+			llvm::raw_fd_ostream dest("output.ll", EC, llvm::sys::fs::OF_None);
+			CodeGen::TheModule->print(dest, nullptr);
+	
+			system("llc output.ll");
+
+			std::cout << "Post-Procesing Assembly...\n";
+
+			std::string compilerArgs = "";
+	
+			if(!MainProgram->attrs.usesCStdLib) {
+	
+				std::string asmResult = Utils_DeleteGCCMainCall("output.s");
+	
+				std::ofstream asmOutput("output.s");
+  				asmOutput << asmResult;
+  				asmOutput.close();
+
+  				compilerArgs += "-nostdlib";
+			}
+
+			std::cout << "Building...\n";
+
+			std::string clangCmd = "clang output.s ";
+			clangCmd += compilerArgs;
+			clangCmd += " -static -o result";
+
+			system(clangCmd.c_str());
+
+			std::cout << "Done!\n";
+
+			return;
+		}
+
+		CodeGen::TheModule->print(llvm::outs(), nullptr);
 	}
 };
 

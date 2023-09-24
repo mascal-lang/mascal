@@ -111,10 +111,19 @@ struct X86AssemblyParser {
 
 			auto Expr = ParseExpression();
 
+			bool sendInstruction = true;
+
 			if(X86AssemblyAST::IsSEH(Expr.get())) {
 				attrs.isStackProtected = true;
+				sendInstruction = false;
 			}
-			else {
+
+			if(X86AssemblyAST::UsesCStdLib(Expr.get())) {
+				attrs.usesCStdLib = true;
+				sendInstruction = false;
+			}
+			
+			if(sendInstruction) {
 				allInstructions.push_back(std::move(Expr));
 			}
 
@@ -244,6 +253,10 @@ struct X86AssemblyParser {
 		X86AssemblyLexer::GetNextToken();
 
 		auto Expr = ParseExpression();
+
+		if(Expr->name == "__main") {
+			return std::make_unique<X86AssemblyAST::EnableStdLib>();
+		}
 
 		return std::make_unique<X86AssemblyAST::Call>(std::move(Expr), type);
 	}

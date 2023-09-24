@@ -13,15 +13,7 @@ int main(int argc, char const *argv[])
 
 		std::string cmd = argv[1];
 
-		if(cmd == "build") {
-
-			//if(argc < 2) {
-			//	cmd = argv[2];
-
-			//	if(cmd == "release") {
-			//		CodeGen::releaseMode = true;
-			//	}
-			//}
+		if(cmd == "build" || cmd == "emit") {
 
 			std::ifstream t("main.mascal");
 			std::string str((std::istreambuf_iterator<char>(t)),
@@ -32,8 +24,10 @@ int main(int argc, char const *argv[])
 			Lexer::AddContent(str);
 		
 			Lexer::Start();
-		
-			Parser::MainLoop();
+			
+			bool canBuild = cmd == "build";
+
+			Parser::MainLoop(canBuild);
 		}
 
 		if(cmd == "translate") {

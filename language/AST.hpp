@@ -1083,6 +1083,7 @@ struct AST {
 	struct Attributes {
 
 		bool isStackProtected = false;
+		bool usesCStdLib = false;
 	};
 
 	struct Program {
