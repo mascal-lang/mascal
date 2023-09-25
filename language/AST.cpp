@@ -133,7 +133,9 @@ llvm::Value* AST::Add::codegen() {
 	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
 	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
 
-	llvm::Value* result = CodeGen::Builder->CreateAdd(L, R);
+	std::string finalName = std::string("add") + target->name;
+
+	llvm::Value* result = CodeGen::Builder->CreateAdd(L, R, finalName.c_str());
 
 	AST::AddInstruction(target.get(), result);
 
@@ -145,7 +147,9 @@ llvm::Value* AST::Sub::codegen() {
 	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
 	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
 
-	llvm::Value* result = CodeGen::Builder->CreateSub(L, R);
+	std::string finalName = std::string("sub") + target->name;
+
+	llvm::Value* result = CodeGen::Builder->CreateSub(L, R, finalName.c_str());
 
 	AST::AddInstruction(target.get(), result);
 
@@ -348,6 +352,8 @@ llvm::Value* AST::If::codegen() {
 		finalEntryBlock = EntryBlock;
 	}
 
+	bool containsLLReturn = false;
+
 	for(auto const& i: if_body) {
 
 		AST::SaveState(i->name, EntryBlock);
@@ -357,6 +363,8 @@ llvm::Value* AST::If::codegen() {
 		}
 
 		i->codegen();
+
+		containsLLReturn = dynamic_cast<AST::LLReturn*>(i.get()) != nullptr;
 	}
 
 	for(auto const& i: if_body) {
@@ -389,7 +397,9 @@ llvm::Value* AST::If::codegen() {
 	TheFunction->getBasicBlockList().push_back(ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
-	AST::CreateIfPHIs(ContinueBlock);
+	if(!containsLLReturn) {
+		AST::CreateIfPHIs(ContinueBlock);
+	}
 
 	for(auto const& i: if_body) {
 		AST::SaveState(i->name, ContinueBlock);

@@ -10,6 +10,18 @@ struct X86AssemblyParser {
 
 	static std::vector<std::unique_ptr<X86AssemblyAST::Expression>> astRegisters;
 	static std::vector<std::unique_ptr<X86AssemblyAST::RAM>> stackMemory;
+	static std::vector<std::string> conditionJumpList;
+
+	static bool IsInConditionJumpList(std::string name) {
+
+		for(auto i : conditionJumpList) {
+			if(i == name) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 
 	static void AddRegister(std::string name) {
 
@@ -107,6 +119,8 @@ struct X86AssemblyParser {
 
 		X86AssemblyAST::Attributes attrs;
 
+		bool isInJmpList = IsInConditionJumpList(name);
+
 		while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile) {
 
 			auto Expr = ParseExpression();
@@ -122,6 +136,10 @@ struct X86AssemblyParser {
 				attrs.usesCStdLib = true;
 				sendInstruction = false;
 			}
+
+			if(X86AssemblyAST::DoesNothing(Expr.get())) {
+				sendInstruction = false;
+			}
 			
 			if(sendInstruction) {
 				allInstructions.push_back(std::move(Expr));
@@ -130,6 +148,15 @@ struct X86AssemblyParser {
 			if(dynamic_cast<X86AssemblyAST::Return*>(Expr.get())) {
 				break;
 			}
+		}
+
+		if(isInJmpList) {
+
+			auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(name, std::move(allInstructions));
+
+			X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
+
+			return std::make_unique<X86AssemblyAST::DoNothing>();
 		}
 
 		return std::make_unique<X86AssemblyAST::Function>(name, attrs, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
@@ -456,6 +483,36 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::EnableSEH>();
 	}
 
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseCompare(std::string type) {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto A = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in 'cmp'.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto B = ParseExpression();
+
+		if(X86AssemblyLexer::IsIdentifier("jge")) {
+
+			X86AssemblyLexer::GetNextToken();
+
+			conditionJumpList.push_back(X86AssemblyLexer::IdentifierStr);
+
+			X86AssemblyLexer::GetNextToken();
+
+			return std::make_unique<X86AssemblyAST::If>(std::move(A), std::move(B), "jge", conditionJumpList[conditionJumpList.size() - 1]);
+		}
+
+		return std::make_unique<X86AssemblyAST::Comment>("Not all jump conditions are currently supported yet.");
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
 
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
@@ -470,6 +527,8 @@ struct X86AssemblyParser {
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
+
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CmpL) { return ParseCompare("L"); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Text) { return ParseText(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Def) { return ParseDef(); }

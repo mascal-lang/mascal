@@ -37,6 +37,8 @@ enum X86AssemblyToken {
 	X86SEH = -20,
 	X86SEHEnd = -21,
 	X86SEHSetFrame = -22,
+
+	X86CmpL = -23,
 };
 
 struct X86AssemblyLexer {
@@ -169,6 +171,8 @@ struct X86AssemblyLexer {
 		else if(IsIdentifier("retq")) return X86AssemblyToken::X86Return;
 
 		else if(IsIdentifier("movl")) return X86AssemblyToken::X86MovL;
+
+		else if(IsIdentifier("cmpl")) return X86AssemblyToken::X86CmpL;
 
 		else if(IsIdentifier(".text")) return X86AssemblyToken::X86Text;
 		else if(IsIdentifier(".def")) return X86AssemblyToken::X86Def;

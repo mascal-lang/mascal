@@ -1,5 +1,7 @@
 #include "X86AssemblyAST.hpp"
 
+std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> X86AssemblyAST::allConditionBlocks;
+
 std::string X86AssemblyAST::Variable::codegen() {
 
 	std::string res;
@@ -81,6 +83,10 @@ std::string X86AssemblyAST::Function::codegen() {
 		res += "\t";
 		res += i->codegen();
 		res += ";\n";
+	}
+
+	if(dynamic_cast<X86AssemblyAST::Return*>(instructions[instructions.size() - 1].get()) == nullptr) {
+		res += "return eax;\n";
 	}
 
 	res += "end\n";
@@ -230,6 +236,42 @@ std::string X86AssemblyAST::P2Align::codegen() {
 	res += ", ";
 	res += std::to_string(limit);
 	res += ").";
+
+	return res;
+}
+
+std::string X86AssemblyAST::If::codegen() {
+
+	std::string res;
+
+	res += "if COMPARE.";
+
+	if(cmpType == "jge") { res += "IsMoreThanOrEquals("; }
+
+	res += B->codegen();
+	res += ", ";
+	res += A->codegen();
+
+	res += ") then\n";
+
+	res += X86AssemblyAST::GetConditionBlock(conditionBlockName)->codegen();
+
+	res += "\tend";
+
+	return res;
+}
+
+std::string X86AssemblyAST::ConditionBlock::codegen() {
+
+	std::string res;
+
+	for(auto const& i : instructions) {
+
+		res += "\t";
+		res += i->codegen();
+		res += ";\n";
+
+	}
 
 	return res;
 }

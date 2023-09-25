@@ -324,12 +324,69 @@ struct X86AssemblyAST {
 		}
 	};
 
+	struct DoNothing : public Expression {
+
+		DoNothing() {}
+
+		std::string codegen() override {
+			return "";
+		}
+	};
+
+	struct ConditionBlock : public Expression {
+
+		std::vector<std::unique_ptr<Expression>> instructions;
+
+		ConditionBlock(std::string name_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
+
+			name = name_in;
+			instructions = std::move(instructions_in);
+		}
+
+		std::string codegen() override;
+	};
+
+	static std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> allConditionBlocks;
+
+	static X86AssemblyAST::ConditionBlock* GetConditionBlock(std::string name) {
+
+		for(auto const& i : allConditionBlocks) {
+			if(i->name == name) {
+				return i.get();
+			}
+		}
+
+		return nullptr;
+	};
+
+	struct If : public Expression {
+
+		std::unique_ptr<Expression> A;
+		std::unique_ptr<Expression> B;
+		std::string cmpType;
+		std::string conditionBlockName;
+
+		If(std::unique_ptr<Expression> A_in, std::unique_ptr<Expression> B_in, std::string cmpType_in, std::string conditionBlockName_in) {
+
+			A = std::move(A_in);
+			B = std::move(B_in);
+			cmpType = cmpType_in;
+			conditionBlockName = conditionBlockName_in;
+		}
+
+		std::string codegen() override;
+	};
+
 	static bool UsesCStdLib(Expression* expr) {
 		return dynamic_cast<EnableStdLib*>(expr) != nullptr;
 	}
 
 	static bool IsSEH(Expression* expr) {
 		return dynamic_cast<EnableSEH*>(expr) != nullptr;
+	}
+
+	static bool DoesNothing(Expression* expr) {
+		return dynamic_cast<DoNothing*>(expr) != nullptr;
 	}
 };
 
