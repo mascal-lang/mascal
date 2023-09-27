@@ -4,7 +4,15 @@
 #include <vector>
 #include <memory>
 
-#define NEW_X86_TYPE(x) struct x : public Type { std::string codegen() override; }
+#define NEW_X86_TYPE(x) struct x : public Type { std::string codegen() override; std::unique_ptr<Type> Clone() override { return std::make_unique<x>(); } }
+
+#define CLONE_X86EXPR_VECTOR(x, y) std::vector<std::unique_ptr<Expression>> y; for(auto const& i: x) { auto z = i->Clone(); y.push_back(std::move(z)); }
+
+#define CLONE_X86RAM_VECTOR(x, y) std::vector<std::unique_ptr<RAM>> y;\
+for(auto const& i: x) {\
+ 	auto z = i->CloneToRAM();\
+ 	y.push_back(std::move(z));\
+}
 
 struct X86AssemblyAST {
 
@@ -14,9 +22,13 @@ struct X86AssemblyAST {
 
 		std::string asmType;
 
+		int ifId = -1;
+
 		virtual ~Expression() = default;
 
 		virtual std::string codegen() = 0;
+
+		virtual std::unique_ptr<Expression> Clone() = 0;
 	};
 
 	struct Type {
@@ -24,6 +36,8 @@ struct X86AssemblyAST {
 		virtual ~Type() = default;
 
 		virtual std::string codegen() = 0;
+
+		virtual std::unique_ptr<Type> Clone() = 0;
 	};
 
 	NEW_X86_TYPE(I32);
@@ -36,6 +50,11 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Variable>(name);
+		}
 	};
 
 	struct IntNumber : public Expression {
@@ -47,6 +66,11 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<IntNumber>(numb);
+		}
 	};
 
 	struct Register : public Expression {
@@ -60,6 +84,11 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Register>(name, ty->Clone());
+		}
 	};
 
 	struct RAM : public Expression {
@@ -75,6 +104,16 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<RAM>(name, pointerName, ty->Clone());
+		}
+
+		std::unique_ptr<RAM> CloneToRAM() {
+
+			return std::make_unique<RAM>(name, pointerName, ty->Clone());
+		}
 	};
 
 	struct Return : public Expression {
@@ -82,6 +121,11 @@ struct X86AssemblyAST {
 		Return() {}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Return>();
+		}
 	};
 
 	struct Attributes {
@@ -137,6 +181,16 @@ struct X86AssemblyAST {
 			instructions = std::move(instructions_in);
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			CLONE_X86EXPR_VECTOR(instructions, clone_instructions)
+			CLONE_X86EXPR_VECTOR(registers, clone_registers)
+
+			CLONE_X86RAM_VECTOR(stack, clone_stack)
+
+			return std::make_unique<Function>(name, attrs, std::move(clone_instructions), std::move(clone_registers), std::move(clone_stack));
+		}
+
 		std::string codegen() override;
 	};
 
@@ -153,6 +207,11 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Add>(value->Clone(), target->Clone(), asmType);
+		}
 	};
 
 	struct Sub : public Expression {
@@ -165,6 +224,11 @@ struct X86AssemblyAST {
 			value = std::move(value_in);
 			target = std::move(target_in);
 			asmType = type;
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Sub>(value->Clone(), target->Clone(), asmType);
 		}
 
 		std::string codegen() override;
@@ -185,6 +249,11 @@ struct X86AssemblyAST {
 			asmType = type;
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Mov>(value->Clone(), target->Clone(), asmType, isMem);
+		}
+
 		std::string codegen() override;
 	};
 
@@ -200,6 +269,11 @@ struct X86AssemblyAST {
 			asmType = type;
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Lea>(value->Clone(), target->Clone(), asmType);
+		}
+
 		std::string codegen() override;
 	};
 
@@ -211,6 +285,11 @@ struct X86AssemblyAST {
 
 			target = std::move(target_in);
 			asmType = type;
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Push>(target->Clone(), asmType);
 		}
 
 		std::string codegen() override;
@@ -226,6 +305,11 @@ struct X86AssemblyAST {
 			asmType = type;
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Pop>(target->Clone(), asmType);
+		}
+
 		std::string codegen() override;
 	};
 
@@ -237,6 +321,11 @@ struct X86AssemblyAST {
 
 			target = std::move(target_in);
 			asmType = type;
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Call>(target->Clone(), asmType);
 		}
 
 		std::string codegen() override;
@@ -252,6 +341,11 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Comment>(message);
+		}
 	};
 
 	struct Def : public Expression {
@@ -264,6 +358,11 @@ struct X86AssemblyAST {
 			name = name_in;
 			scl = scl_in;
 			ty = ty_in;
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Def>(name, scl, ty);
 		}
 
 		std::string codegen() override;
@@ -279,6 +378,11 @@ struct X86AssemblyAST {
 			target = std::move(target_in);
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Set>(name, target->Clone());
+		}
+
 		std::string codegen() override;
 	};
 
@@ -287,6 +391,11 @@ struct X86AssemblyAST {
 		File(std::string fileName_in) {
 
 			name = fileName_in;
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<File>(name);
 		}
 
 		std::string codegen() override;
@@ -303,6 +412,11 @@ struct X86AssemblyAST {
 			limit = limit_in;
 		}
 
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<P2Align>(bytes, limit);
+		}
+
 		std::string codegen() override;
 	};
 
@@ -313,6 +427,11 @@ struct X86AssemblyAST {
 		std::string codegen() override {
 			return "";
 		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<EnableSEH>();
+		}
 	};
 
 	struct EnableStdLib : public Expression {
@@ -322,6 +441,11 @@ struct X86AssemblyAST {
 		std::string codegen() override {
 			return "";
 		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<EnableStdLib>();
+		}
 	};
 
 	struct DoNothing : public Expression {
@@ -330,6 +454,11 @@ struct X86AssemblyAST {
 
 		std::string codegen() override {
 			return "";
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<DoNothing>();
 		}
 	};
 
@@ -344,6 +473,13 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			CLONE_X86EXPR_VECTOR(instructions, clone_instructions)
+
+			return std::make_unique<ConditionBlock>(name, std::move(clone_instructions));
+		}
 	};
 
 	static std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> allConditionBlocks;
@@ -375,7 +511,63 @@ struct X86AssemblyAST {
 		}
 
 		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
+		}
+
+		std::unique_ptr<If> CloneToIf() {
+
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
+		}
 	};
+
+	struct While : public Expression {
+
+		std::unique_ptr<If> cmp;
+		std::vector<std::unique_ptr<Expression>> instructions;
+
+		While(std::unique_ptr<If> cmp_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
+
+			cmp = std::move(cmp_in);
+			instructions = std::move(instructions_in);
+		}
+
+		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			CLONE_X86EXPR_VECTOR(instructions, clone_instructions)
+
+			return std::make_unique<While>(cmp->CloneToIf(), std::move(clone_instructions));
+		}
+	};
+
+	struct Jump : public Expression {
+
+		Jump(std::string to) {
+			name = to;
+		}
+
+		std::string codegen() override {
+			return "";
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Jump>(name);
+		}
+	};
+
+	static bool IsJumpRecursive(Expression* expr, std::string functionName) {
+
+		if(dynamic_cast<Jump*>(expr) != nullptr) {
+			return expr->name == functionName;
+		}
+
+		return false;
+	}
 
 	static bool UsesCStdLib(Expression* expr) {
 		return dynamic_cast<EnableStdLib*>(expr) != nullptr;

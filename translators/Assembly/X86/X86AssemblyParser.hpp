@@ -111,6 +111,20 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::IntNumber>(std::stoi(X86AssemblyLexer::NumValString));
 	}
 
+	static std::string GetOppositeComparator(std::string comp) {
+
+		if(comp == "jge") { return "jl"; }
+		if(comp == "jl") { return "jge"; }
+
+		if(comp == "jle") { return "jg"; }
+		if(comp == "jg") { return "jle"; }
+
+		if(comp == "jne") { return "je"; }
+		if(comp == "je") { return "jne"; }
+
+		return comp;
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseFunction(std::string name) {
 
 		X86AssemblyLexer::GetNextToken();
@@ -120,6 +134,11 @@ struct X86AssemblyParser {
 		X86AssemblyAST::Attributes attrs;
 
 		bool isInJmpList = IsInConditionJumpList(name);
+		bool isWhileLoop = false;
+
+		std::unique_ptr<X86AssemblyAST::If> lastIf = nullptr;
+
+		int ifIdCount = 0;
 
 		while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile) {
 
@@ -140,6 +159,23 @@ struct X86AssemblyParser {
 			if(X86AssemblyAST::DoesNothing(Expr.get())) {
 				sendInstruction = false;
 			}
+
+			if(X86AssemblyAST::IsJumpRecursive(Expr.get(), name)) {
+				isWhileLoop = true;
+				sendInstruction = false;
+			}
+
+			if(dynamic_cast<X86AssemblyAST::If*>(Expr.get()) != nullptr) {
+
+				X86AssemblyAST::If* getIf = dynamic_cast<X86AssemblyAST::If*>(Expr.get());
+
+				lastIf = getIf->CloneToIf();
+
+				lastIf->ifId = ifIdCount;
+				Expr->ifId = ifIdCount;
+
+				ifIdCount += 1;
+			}
 			
 			if(sendInstruction) {
 				allInstructions.push_back(std::move(Expr));
@@ -148,6 +184,19 @@ struct X86AssemblyParser {
 			if(dynamic_cast<X86AssemblyAST::Return*>(Expr.get())) {
 				break;
 			}
+		}
+
+		if(isWhileLoop) {
+
+			if(lastIf == nullptr) {
+				std::cout << "Internal Error: 'lastIf' is nullptr.\n";
+				exit(1);
+				return nullptr;
+			}
+
+			lastIf->cmpType = GetOppositeComparator(lastIf->cmpType);
+
+			return std::make_unique<X86AssemblyAST::While>(std::move(lastIf), std::move(allInstructions));
 		}
 
 		if(isInJmpList) {
@@ -513,6 +562,17 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::Comment>("Not all jump conditions are currently supported yet.");
 	}
 
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseJump() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		std::string callName = X86AssemblyLexer::IdentifierStr;
+
+		X86AssemblyLexer::GetNextToken();
+
+		return std::make_unique<X86AssemblyAST::Jump>(callName);
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseExpression() {
 
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
@@ -529,6 +589,7 @@ struct X86AssemblyParser {
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CmpL) { return ParseCompare("L"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Jmp) { return ParseJump(); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Text) { return ParseText(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Def) { return ParseDef(); }

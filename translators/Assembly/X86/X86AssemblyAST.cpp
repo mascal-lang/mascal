@@ -240,13 +240,28 @@ std::string X86AssemblyAST::P2Align::codegen() {
 	return res;
 }
 
+std::string JumpInstructionToCompare(std::string comp) {
+
+	if(comp == "jge") { return "IsMoreThanOrEquals"; }
+	if(comp == "jle") { return "IsLessThanOrEquals"; }
+
+	if(comp == "jg") { return "IsMoreThan"; }
+	if(comp == "jl") { return "IsLessThan"; }
+
+	if(comp == "je") { return "IsEquals"; }
+	if(comp == "jne") { return "IsNotEquals"; }
+
+	return "";
+}
+
 std::string X86AssemblyAST::If::codegen() {
 
 	std::string res;
 
 	res += "if COMPARE.";
 
-	if(cmpType == "jge") { res += "IsMoreThanOrEquals("; }
+	res += JumpInstructionToCompare(cmpType);
+	res += "(";
 
 	res += B->codegen();
 	res += ", ";
@@ -257,6 +272,38 @@ std::string X86AssemblyAST::If::codegen() {
 	res += X86AssemblyAST::GetConditionBlock(conditionBlockName)->codegen();
 
 	res += "\tend";
+
+	return res;
+}
+
+std::string X86AssemblyAST::While::codegen() {
+
+	std::string res;
+
+	res += "while COMPARE.";
+
+	res += JumpInstructionToCompare(cmp->cmpType);
+	res += "(";
+
+	res += cmp->B->codegen();
+	res += ", ";
+	res += cmp->A->codegen();
+
+	res += ") do\n";
+
+	for(auto const& i : instructions) {
+
+		if(i->ifId != cmp->ifId) {
+			
+			res += "\t";
+			res += i->codegen();
+			res += ";\n";
+		}
+	}
+
+	res += "end;\n";
+
+	res += X86AssemblyAST::GetConditionBlock(cmp->conditionBlockName)->codegen();
 
 	return res;
 }

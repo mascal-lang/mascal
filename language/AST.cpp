@@ -258,7 +258,7 @@ llvm::Value* AST::While::codegen() {
 
 		AST::SaveState(i->name, EntryBlock);
 
-		bool isNotAVar = AST::IsInitializer(i.get()) || AST::IsAlgorithm(i.get());
+		bool isNotAVar = AST::IsInitializer(i.get()) || AST::IsAlgorithm(i.get()) || GetAllocaFromMem(i.get()) != nullptr;
 
 		if(!isNotAVar) {
 
@@ -294,10 +294,14 @@ llvm::Value* AST::While::codegen() {
 		}
 	}
 
-	CodeGen::Builder->CreateCondBr(condition->codegen(), LoopBlock, ContinueBlock);
+	CodeGen::Builder->CreateCondBr(repeat_condition->codegen(), LoopBlock, ContinueBlock);
 
 	TheFunction->getBasicBlockList().push_back(ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
+
+	for(auto const& i: loop_body) {
+		AST::SaveState(i->name, ContinueBlock);
+	}
 
 	UNORDERED_MAP_FOREACH(std::string, llvm::PHINode*, allPHIs, it) {
 
@@ -312,10 +316,6 @@ llvm::Value* AST::While::codegen() {
 		CodeGen::AddPHINodeToVec(finalPHI);
 
 		AST::AddInstructionToName(it->first, finalPHI);
-	}
-
-	for(auto const& i: loop_body) {
-		AST::SaveState(i->name, ContinueBlock);
 	}
 
 	return nullptr;
@@ -473,6 +473,7 @@ llvm::Value* AST::GetOrCreateInstruction(AST::Expression* e) {
 	llvm::Value* result = AST::GetCurrentInstruction(e);
 
 	if(result == nullptr) {
+
 		return e->codegen();
 	}
 
@@ -513,9 +514,12 @@ void AST::SaveState(std::string name, llvm::BasicBlock* bb) {
 
 	std::string bbName = std::string(bb->getName());
 
-	CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
 
-	//std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
+		//std::cout << "Saved '" << name << "' state in '" << bbName << "'.\n";
+
+		CodeGen::all_coms[name]->states[bbName] = CodeGen::all_coms[name]->current;
+	}
 }
 
 void AST::SetExistingState(std::string name, llvm::BasicBlock* bb) {

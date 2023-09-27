@@ -31,6 +31,10 @@ struct Parser {
 
 	static AST::Attributes currentAttributes;
 
+	static std::unique_ptr<AST::Expression> lastCompareOne;
+	static std::unique_ptr<AST::Expression> lastCompareTwo;
+	static int lastCmpType;
+
 	static void AddParserCom(std::string name, AST::Type* t) {
 
 		all_parser_coms[name] = t;
@@ -450,6 +454,10 @@ struct Parser {
 
 		int finalCompare = TextToCompareType(compareType);
 
+		lastCompareOne = CompareOne->Clone();
+		lastCompareTwo = CompareTwo->Clone();
+		lastCmpType = finalCompare;
+
 		return std::make_unique<AST::Compare>(MemTreatment(std::move(CompareOne)), MemTreatment(std::move(CompareTwo)), finalCompare);
 	}
 
@@ -549,7 +557,7 @@ struct Parser {
 
 		std::unique_ptr<AST::Expression> value = ParseExpression();
 
-		return std::make_unique<AST::MemStore>(std::move(target), MemTreatment(std::move(value)));
+		return std::make_unique<AST::MemStore>(Mem_Verify(std::move(target)), MemTreatment(std::move(value)));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseLoadMem() {
@@ -588,6 +596,12 @@ struct Parser {
 
 		auto Cond = ParseExpression();
 
+		auto cOneOrigin = std::move(lastCompareOne);
+		auto cTwoOrigin = std::move(lastCompareTwo);
+
+		int cmpTypeOrigin = lastCmpType;
+		lastCmpType = 0;
+
 		if(Lexer::CurrentToken != Token::Do) {
 			ExprError("Expected 'do' keyword.");
 		}
@@ -596,9 +610,25 @@ struct Parser {
 
 		std::vector<std::unique_ptr<AST::Expression>> loop_body;
 
+		std::vector<std::string> verifyMemAtEnd;
+
+		UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<Parser_Mem>, all_parser_mems, it) {
+
+			it->second->loadVariableName = "";
+
+			it->second->is_verified = true;
+		}
+
 		while(Lexer::CurrentToken != Token::End) {
 
 			std::unique_ptr<AST::Expression> e = ParseExpression();
+
+			if(dynamic_cast<AST::MemStore*>(e.get()) != nullptr) {
+
+				AST::MemStore* ms = dynamic_cast<AST::MemStore*>(e.get());
+
+				verifyMemAtEnd.push_back(ms->target->name);
+			}
 
 			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside while loop."); }
 
@@ -611,7 +641,16 @@ struct Parser {
 
 		Lexer::GetNextToken();
 
-		return std::make_unique<AST::While>(std::move(Cond), std::move(loop_body));
+		auto RepeatCond = std::make_unique<AST::Compare>(MemTreatment(std::move(cOneOrigin)), MemTreatment(std::move(cTwoOrigin)), cmpTypeOrigin);
+
+		for(auto i : verifyMemAtEnd) {
+
+			Parser::all_parser_mems[i]->loadVariableName = "";
+
+			Parser::all_parser_mems[i]->is_verified = true;
+		}
+
+		return std::make_unique<AST::While>(std::move(Cond), std::move(RepeatCond), std::move(loop_body));
 	}
 
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
@@ -680,6 +719,18 @@ struct Parser {
 		initStore.push_back(std::make_unique<AST::MemStore>(std::move(V), std::make_unique<AST::Variable>(getLoadName)));
 
 		return Mem_CreateAutoLoad(std::make_unique<AST::Variable>(getVName), std::move(initStore));
+	}
+
+	static std::unique_ptr<AST::Expression> Mem_Verify(std::unique_ptr<AST::Expression> V) {
+
+		if(Parser::all_parser_mems.find(V->name) != Parser::all_parser_mems.end()) {
+
+			Parser::all_parser_mems[V->name]->loadVariableName.clear();
+
+			Parser::all_parser_mems[V->name]->is_verified = true;
+		}
+
+		return std::move(V);
 	}
 
 	static std::unique_ptr<AST::Expression> MemTreatment(std::unique_ptr<AST::Expression> V, bool is_left_ident = false) {
@@ -761,7 +812,7 @@ struct Parser {
 
 			auto R = ParseExpression();
 
-			return std::make_unique<AST::MemStore>(std::move(L), MemTreatment(std::move(R)));
+			return std::make_unique<AST::MemStore>(Mem_Verify(std::move(L)), MemTreatment(std::move(R)));
 		}
 
 		ExprError("Unknown var type found.");

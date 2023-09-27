@@ -770,11 +770,13 @@ struct AST {
 	struct While : public Expression {
 
 		EXPR_OBJ() condition;
+		EXPR_OBJ() repeat_condition;
 		EXPR_OBJ_VECTOR() loop_body;
 
-		While(EXPR_OBJ() condition_in, EXPR_OBJ_VECTOR() loop_body_in) {
+		While(EXPR_OBJ() condition_in, EXPR_OBJ() repeat_condition_in, EXPR_OBJ_VECTOR() loop_body_in) {
 
 			condition = std::move(condition_in);
+			repeat_condition = std::move(repeat_condition_in);
 			loop_body = std::move(loop_body_in);
 		}
 
@@ -820,6 +822,7 @@ struct AST {
 		void ReplaceTargetNameTo(std::string from, std::string to) override {
 
 			condition->ReplaceTargetNameTo(from, to);
+			repeat_condition->ReplaceTargetNameTo(from, to);
 
 			for(auto const& i : loop_body) {
 
@@ -830,6 +833,10 @@ struct AST {
 		bool ContainsName(std::string str) override {
 
 			if(condition->ContainsName(str)) {
+				return true;
+			}
+
+			if(repeat_condition->ContainsName(str)) {
 				return true;
 			}
 
@@ -846,7 +853,7 @@ struct AST {
 
 			CLONE_EXPR_VECTOR(loop_body, clone_loop_body);
 
-			return std::make_unique<While>(condition->Clone(), std::move(clone_loop_body));
+			return std::make_unique<While>(condition->Clone(), repeat_condition->Clone(), std::move(clone_loop_body));
 		}
 	};
 
