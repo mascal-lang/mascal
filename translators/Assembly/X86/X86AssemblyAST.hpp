@@ -199,18 +199,17 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> value;
 		std::unique_ptr<Expression> target;
 
-		Add(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
+		Add(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::string codegen() override;
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Add>(value->Clone(), target->Clone(), asmType);
+			return std::make_unique<Add>(value->Clone(), target->Clone());
 		}
 	};
 
@@ -219,16 +218,15 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> value;
 		std::unique_ptr<Expression> target;
 
-		Sub(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
+		Sub(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Sub>(value->Clone(), target->Clone(), asmType);
+			return std::make_unique<Sub>(value->Clone(), target->Clone());
 		}
 
 		std::string codegen() override;
@@ -241,17 +239,16 @@ struct X86AssemblyAST {
 
 		bool isMem = false;
 
-		Mov(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type, bool isMem_in = false) {
+		Mov(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, bool isMem_in = false) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
 			isMem = isMem_in;
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Mov>(value->Clone(), target->Clone(), asmType, isMem);
+			return std::make_unique<Mov>(value->Clone(), target->Clone(), isMem);
 		}
 
 		std::string codegen() override;
@@ -262,16 +259,15 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> value;
 		std::unique_ptr<Expression> target;
 
-		Lea(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in, std::string type) {
+		Lea(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
 
 			value = std::move(value_in);
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Lea>(value->Clone(), target->Clone(), asmType);
+			return std::make_unique<Lea>(value->Clone(), target->Clone());
 		}
 
 		std::string codegen() override;
@@ -281,15 +277,14 @@ struct X86AssemblyAST {
 
 		std::unique_ptr<Expression> target;
 
-		Push(std::unique_ptr<Expression> target_in, std::string type) {
+		Push(std::unique_ptr<Expression> target_in) {
 
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Push>(target->Clone(), asmType);
+			return std::make_unique<Push>(target->Clone());
 		}
 
 		std::string codegen() override;
@@ -299,15 +294,14 @@ struct X86AssemblyAST {
 
 		std::unique_ptr<Expression> target;
 
-		Pop(std::unique_ptr<Expression> target_in, std::string type) {
+		Pop(std::unique_ptr<Expression> target_in) {
 
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Pop>(target->Clone(), asmType);
+			return std::make_unique<Pop>(target->Clone());
 		}
 
 		std::string codegen() override;
@@ -317,15 +311,14 @@ struct X86AssemblyAST {
 
 		std::unique_ptr<Expression> target;
 
-		Call(std::unique_ptr<Expression> target_in, std::string type) {
+		Call(std::unique_ptr<Expression> target_in) {
 
 			target = std::move(target_in);
-			asmType = type;
 		}
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<Call>(target->Clone(), asmType);
+			return std::make_unique<Call>(target->Clone());
 		}
 
 		std::string codegen() override;

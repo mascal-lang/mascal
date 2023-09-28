@@ -11,35 +11,30 @@ enum X86AssemblyToken {
 	X86Identifier = -2,
 	X86Number = -3,
 
-	X86AddL = -4,
-	X86AddQ = -5,
-
-	X86MovL = -6,
-
+	X86Add = -4,
+	X86Sub = -5,
+	X86Mov = -6,
 	X86Return = -7,
+	X86Cmp = -8,
+	X86Jmp = -9,
 
-	X86PushQ = -8,
-	X86SubQ = -9,
-	X86LeaQ = -10,
-	X86CallQ = -11,
+	X86Push = -10,
+	X86Pop = -11,
+	X86Lea = -12,
+	X86Call = -13,
 
-	X86PopQ = -12,
+	X86Text = -14,
+	X86Def = -15,
+	X86Globl = -16,
+	X86Set = -17,
+	X86File = -18,
+	X86P2Align = -19,
 
-	X86Text = -13,
-	X86Def = -14,
-	X86Globl = -15,
-	X86Set = -16,
-	X86File = -17,
-	X86P2Align = -18,
+	X86String = -20,
 
-	X86String = -19,
-
-	X86SEH = -20,
-	X86SEHEnd = -21,
-	X86SEHSetFrame = -22,
-
-	X86CmpL = -23,
-	X86Jmp = -24,
+	X86SEH = -21,
+	X86SEHEnd = -22,
+	X86SEHSetFrame = -23,
 };
 
 struct X86AssemblyLexer {
@@ -152,6 +147,24 @@ struct X86AssemblyLexer {
 		return isalnum(c) || c == '_' || c == '.';
 	}
 
+	static bool IsMultipleBitIdentifier(std::string s) {
+
+		std::string bit8version = s + "b";
+		std::string bit16version = s + "w";
+		std::string bitlong32version = s + "l";
+		std::string bit32version = s + "s";
+		std::string bit64version = s + "q";
+		std::string bit80version = s + "t";
+
+		return IsIdentifier(s) || 
+		IsIdentifier(bit8version) ||
+		IsIdentifier(bit16version) ||
+		IsIdentifier(bitlong32version) ||
+		IsIdentifier(bit32version) ||
+		IsIdentifier(bit64version) ||
+		IsIdentifier(bit80version);
+	}
+
 	static int GetIdentifier() {
 
 		IdentifierStr = LastChar;
@@ -161,19 +174,18 @@ struct X86AssemblyLexer {
 			IdentifierStr += LastChar;
 		}
 
-		if(IsIdentifier("addl")) return X86AssemblyToken::X86AddL;
+		if(IsMultipleBitIdentifier("add")) return X86AssemblyToken::X86Add;
 
-		else if(IsIdentifier("addq")) return X86AssemblyToken::X86AddQ;
-		else if(IsIdentifier("subq")) return X86AssemblyToken::X86SubQ;
-		else if(IsIdentifier("leaq")) return X86AssemblyToken::X86LeaQ;
-		else if(IsIdentifier("callq")) return X86AssemblyToken::X86CallQ;
-		else if(IsIdentifier("popq")) return X86AssemblyToken::X86PopQ;
-		else if(IsIdentifier("pushq")) return X86AssemblyToken::X86PushQ;
-		else if(IsIdentifier("retq")) return X86AssemblyToken::X86Return;
+		else if(IsMultipleBitIdentifier("sub")) return X86AssemblyToken::X86Sub;
+		else if(IsMultipleBitIdentifier("lea")) return X86AssemblyToken::X86Lea;
+		else if(IsMultipleBitIdentifier("call")) return X86AssemblyToken::X86Call;
+		else if(IsMultipleBitIdentifier("pop")) return X86AssemblyToken::X86Pop;
+		else if(IsMultipleBitIdentifier("push")) return X86AssemblyToken::X86Push;
+		else if(IsMultipleBitIdentifier("ret")) return X86AssemblyToken::X86Return;
 
-		else if(IsIdentifier("movl")) return X86AssemblyToken::X86MovL;
+		else if(IsMultipleBitIdentifier("mov")) return X86AssemblyToken::X86Mov;
+		else if(IsMultipleBitIdentifier("cmp")) return X86AssemblyToken::X86Cmp;
 
-		else if(IsIdentifier("cmpl")) return X86AssemblyToken::X86CmpL;
 		else if(IsIdentifier("jmp")) return X86AssemblyToken::X86Jmp;
 
 		else if(IsIdentifier(".text")) return X86AssemblyToken::X86Text;

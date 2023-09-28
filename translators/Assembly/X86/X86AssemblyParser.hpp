@@ -236,7 +236,7 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::Return>();
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseAdd(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseAdd() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -250,10 +250,10 @@ struct X86AssemblyParser {
 
 		auto Two = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Add>(std::move(One), std::move(Two), type);
+		return std::make_unique<X86AssemblyAST::Add>(std::move(One), std::move(Two));
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseSub(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseSub() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -267,10 +267,10 @@ struct X86AssemblyParser {
 
 		auto Two = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Sub>(std::move(One), std::move(Two), type);
+		return std::make_unique<X86AssemblyAST::Sub>(std::move(One), std::move(Two));
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -286,10 +286,10 @@ struct X86AssemblyParser {
 
 		bool isMem = StackMemoryExists(Two->name);
 
-		return std::make_unique<X86AssemblyAST::Mov>(std::move(One), std::move(Two), type, isMem);
+		return std::make_unique<X86AssemblyAST::Mov>(std::move(One), std::move(Two), isMem);
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseLea(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseLea() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -303,28 +303,28 @@ struct X86AssemblyParser {
 
 		auto Two = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Lea>(std::move(One), std::move(Two), type);
+		return std::make_unique<X86AssemblyAST::Lea>(std::move(One), std::move(Two));
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParsePush(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParsePush() {
 
 		X86AssemblyLexer::GetNextToken();
 
 		auto Expr = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Push>(std::move(Expr), type);
+		return std::make_unique<X86AssemblyAST::Push>(std::move(Expr));
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParsePop(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParsePop() {
 
 		X86AssemblyLexer::GetNextToken();
 
 		auto Expr = ParseExpression();
 
-		return std::make_unique<X86AssemblyAST::Pop>(std::move(Expr), type);
+		return std::make_unique<X86AssemblyAST::Pop>(std::move(Expr));
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseCall(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseCall() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -334,7 +334,7 @@ struct X86AssemblyParser {
 			return std::make_unique<X86AssemblyAST::EnableStdLib>();
 		}
 
-		return std::make_unique<X86AssemblyAST::Call>(std::move(Expr), type);
+		return std::make_unique<X86AssemblyAST::Call>(std::move(Expr));
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseText() {
@@ -532,7 +532,7 @@ struct X86AssemblyParser {
 		return std::make_unique<X86AssemblyAST::EnableSEH>();
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseCompare(std::string type) {
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseCompare() {
 
 		X86AssemblyLexer::GetNextToken();
 
@@ -578,16 +578,15 @@ struct X86AssemblyParser {
 		if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Identifier) { return ParseIdentifier(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Return) { return ParseReturn(); }
 
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddQ) { return ParseAdd("Q"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SubQ) { return ParseSub("Q"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86LeaQ) { return ParseLea("Q"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86PushQ) { return ParsePush("Q"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86PopQ) { return ParsePop("Q"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CallQ) { return ParseCall("Q"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Add) { return ParseAdd(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Sub) { return ParseSub(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Lea) { return ParseLea(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Push) { return ParsePush(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Pop) { return ParsePop(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Call) { return ParseCall(); }
 
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
-		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CmpL) { return ParseCompare("L"); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Mov) { return ParseMov(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Cmp) { return ParseCompare(); }
 		
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Jmp) { return ParseJump(); }
 
