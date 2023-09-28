@@ -98,8 +98,8 @@ std::string X86AssemblyAST::Add::codegen() {
 
 	std::string res;
 
-	if(asmType == "Q") {
-		return "# 'addq' instruction not supported yet.";
+	if(X86AssemblyAST::IsStackPointer(target->name)) {
+		return std::string("# [Assembly]: Pop '") + value->codegen() + std::string("' bytes from Stack Pointer.");
 	}
 
 	res += "add ";
@@ -114,12 +114,8 @@ std::string X86AssemblyAST::Sub::codegen() {
 
 	std::string res;
 
-	if(target->name == "rsp") {
+	if(X86AssemblyAST::IsStackPointer(target->name)) {
 		return std::string("# [Assembly]: Reserve '") + value->codegen() + std::string("' bytes for local variables.");
-	}
-
-	if(asmType == "Q") {
-		return "# 'subq' instruction not supported yet.";
 	}
 
 	res += "sub ";
@@ -133,10 +129,6 @@ std::string X86AssemblyAST::Sub::codegen() {
 std::string X86AssemblyAST::Mov::codegen() {
 
 	std::string res;
-
-	if(asmType == "Q") {
-		return "# 'movq' instruction not supported yet.";
-	}
 
 	if(!isMem) {
 		res += "comstore ";
@@ -159,7 +151,7 @@ std::string X86AssemblyAST::Lea::codegen() {
 
 std::string X86AssemblyAST::Push::codegen() {
 
-	if(target->name == "rbp") {
+	if(X86AssemblyAST::IsBasePointer(target->name)) {
 		return "# [Assembly]: Initialize the Base Pointer.";
 	}
 
@@ -168,7 +160,7 @@ std::string X86AssemblyAST::Push::codegen() {
 
 std::string X86AssemblyAST::Pop::codegen() {
 
-	if(target->name == "rbp") {
+	if(X86AssemblyAST::IsBasePointer(target->name)) {
 		return "# [Assembly]: Pop the Base Pointer to close the program.";
 	}
 

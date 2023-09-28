@@ -614,7 +614,7 @@ struct Parser {
 
 		UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<Parser_Mem>, all_parser_mems, it) {
 
-			it->second->loadVariableName = "";
+			it->second->loadVariableName.clear();
 
 			it->second->is_verified = true;
 		}
@@ -643,11 +643,11 @@ struct Parser {
 
 		auto RepeatCond = std::make_unique<AST::Compare>(MemTreatment(std::move(cOneOrigin)), MemTreatment(std::move(cTwoOrigin)), cmpTypeOrigin);
 
-		for(auto i : verifyMemAtEnd) {
+		UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<Parser_Mem>, all_parser_mems, it) {
 
-			Parser::all_parser_mems[i]->loadVariableName = "";
+			it->second->loadVariableName.clear();
 
-			Parser::all_parser_mems[i]->is_verified = true;
+			it->second->is_verified = true;
 		}
 
 		return std::make_unique<AST::While>(std::move(Cond), std::move(RepeatCond), std::move(loop_body));
@@ -702,6 +702,8 @@ struct Parser {
 
 		addVec.push_back(std::move(newCom));
 
+		//std::cout << getComName << "'s new auto load created!\n";
+
 		return std::make_unique<AST::Variable>(getComName, std::move(addVec));
 	}
 
@@ -735,8 +737,9 @@ struct Parser {
 
 	static std::unique_ptr<AST::Expression> MemTreatment(std::unique_ptr<AST::Expression> V, bool is_left_ident = false) {
 
-		if(Parser::all_parser_mems.find(V->name) == Parser::all_parser_mems.end())
+		if(Parser::all_parser_mems.find(V->name) == Parser::all_parser_mems.end()) {
 			return V;
+		}
 
 		if(Parser::all_parser_mems[V->name]->loadVariableName == "" && Parser::all_parser_mems[V->name]->is_verified) {
 			return Mem_CreateAutoLoad(std::move(V));
@@ -758,7 +761,7 @@ struct Parser {
 			std::string getMemName = V->name;
 	
 			auto result = MemTreatment(std::move(V), true);
-	
+
 			Parser::all_parser_mems[getMemName]->is_verified = false;
 	
 			return result;
@@ -1051,6 +1054,8 @@ struct Parser {
 			if (Lexer::CurrentToken == Token::Program) 		MainProgram = std::move(HandleProgram());
 			if (Lexer::CurrentToken == Token::Procedure) 	HandleProcedure();
 		}
+
+		//std::cout << "CodeGen...\n";
 
 		MainProgram->codegen();
 

@@ -587,8 +587,8 @@ struct X86AssemblyParser {
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86AddL) { return ParseAdd("L"); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86MovL) { return ParseMov("L"); }
-
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86CmpL) { return ParseCompare("L"); }
+		
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Jmp) { return ParseJump(); }
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Text) { return ParseText(); }

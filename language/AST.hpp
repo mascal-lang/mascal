@@ -71,7 +71,11 @@ struct AST {
 
 		std::unique_ptr<Type> ty;
 
+		std::unique_ptr<Expression> target;
+
 		llvm::BasicBlock* parent_entry_block = nullptr;
+
+		bool areInitializersGenerated = false;
 
 		virtual llvm::Value* codegen() = 0;
 
@@ -169,8 +173,6 @@ struct AST {
 
 	struct Com : public Expression {
 
-		EXPR_OBJ() target;
-
 		Com(std::string name_in, std::unique_ptr<Type> ty_in, EXPR_OBJ() target_in) {
 
 			name = name_in;
@@ -225,8 +227,6 @@ struct AST {
 	};
 
 	struct Mem : public Expression {
-
-		EXPR_OBJ() target;
 
 		Mem(std::string name_in, std::unique_ptr<Type> ty_in, EXPR_OBJ() target_in) {
 
@@ -300,8 +300,6 @@ struct AST {
 
 	struct LLReturn : public Expression {
 
-		EXPR_OBJ() target;
-
 		LLReturn(EXPR_OBJ() target_in) {
 
 			target = std::move(target_in);
@@ -347,7 +345,6 @@ struct AST {
 
 	struct Add : public Expression {
 
-		EXPR_OBJ() target;
 		EXPR_OBJ() value;
 
 		Add(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
@@ -405,7 +402,6 @@ struct AST {
 
 	struct Sub : public Expression {
 
-		EXPR_OBJ() target;
 		EXPR_OBJ() value;
 
 		Sub(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
@@ -463,7 +459,6 @@ struct AST {
 
 	struct IntCast : public Expression {
 
-		EXPR_OBJ() target;
 		TYPE_OBJ() intType;
 
 		IntCast(EXPR_OBJ() target_in, TYPE_OBJ() intType_in) {
@@ -518,7 +513,6 @@ struct AST {
 
 	struct ComStore : public Expression {
 
-		EXPR_OBJ() target;
 		EXPR_OBJ() value;
 
 		ComStore(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
@@ -576,8 +570,6 @@ struct AST {
 
 	struct LoadMem : public Expression {
 
-		EXPR_OBJ() target;
-
 		LoadMem(EXPR_OBJ() target_in) {
 
 			target = std::move(target_in);
@@ -626,7 +618,6 @@ struct AST {
 
 	struct MemStore : public Expression {
 
-		EXPR_OBJ() target;
 		EXPR_OBJ() value;
 
 		MemStore(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
@@ -1139,6 +1130,7 @@ struct AST {
 	static llvm::Value* GetOrCreateInstruction(AST::Expression* e);
 
 	static llvm::Value* GetAllocaFromMem(AST::Expression* e);
+	static llvm::Value* GetAllocaFromMemByName(std::string name);
 
 	static void AddInstruction(AST::Expression* e, llvm::Value* l);
 	static void AddInstructionToName(std::string name, llvm::Value* l);

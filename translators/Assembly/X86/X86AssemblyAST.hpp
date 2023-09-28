@@ -580,6 +580,30 @@ struct X86AssemblyAST {
 	static bool DoesNothing(Expression* expr) {
 		return dynamic_cast<DoNothing*>(expr) != nullptr;
 	}
+
+	static bool IsStackPointer(std::string s) {
+	
+		if(s.size() == 3) {
+	
+			if(s[1] == 's' && s[2] == 'p') {
+				return true;
+			}
+		}
+	
+		return false;
+	}
+	
+	static bool IsBasePointer(std::string s) {
+	
+		if(s.size() == 3) {
+	
+			if(s[1] == 'b' && s[2] == 'p') {
+				return true;
+			}
+		}
+	
+		return false;
+	}
 };
 
 #endif

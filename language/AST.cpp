@@ -79,8 +79,15 @@ llvm::Value* AST::IntNumber::codegen() {
 
 llvm::Value* AST::Variable::codegen() {
 
-	for(auto const& i : initializers) {
-		i->codegen();
+	std::cout << "Executing " << name << " initializers...\n";
+
+	if(!areInitializersGenerated) {
+
+		for(auto const& i : initializers) {
+			i->codegen();
+		}
+
+		areInitializersGenerated = true;
 	}
 
 	llvm::Value* result = AST::GetCurrentInstructionByName(name);
@@ -104,7 +111,11 @@ llvm::Value* AST::Com::codegen() {
 
 	CodeGen::all_coms[name] = std::move(lcom);
 
-	return CodeGen::all_coms[name]->origin;
+	AST::SaveState(name, CodeGen::Builder->GetInsertBlock());
+
+	std::cout << name << " successfully created!\n";
+
+	return CodeGen::all_coms[name]->current;
 }
 
 llvm::Value* AST::Mem::codegen() {
@@ -175,8 +186,13 @@ llvm::Value* AST::ComStore::codegen() {
 
 llvm::Value* AST::GetAllocaFromMem(AST::Expression* e) {
 
-	if(CodeGen::all_mems.find(e->name) != CodeGen::all_mems.end()) {
-		return CodeGen::all_mems[e->name]->origin;
+	return GetAllocaFromMemByName(e->name);
+}
+
+llvm::Value* AST::GetAllocaFromMemByName(std::string name) {
+
+	if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
+		return CodeGen::all_mems[name]->origin;
 	}
 
 	return nullptr;
@@ -227,12 +243,25 @@ llvm::Value* AST::Compare::codegen() {
 
 bool AST::IsInitializer(AST::Expression* t) {
 
-	return dynamic_cast<AST::Com*>(t) != nullptr || dynamic_cast<AST::Mem*>(t) != nullptr;
+	return dynamic_cast<AST::Com*>(t) != nullptr || dynamic_cast<AST::Mem*>(t) != nullptr || dynamic_cast<AST::LoadMem*>(t) != nullptr;
 }
 
 bool AST::IsAlgorithm(AST::Expression* t) {
 
 	return dynamic_cast<AST::If*>(t) != nullptr || dynamic_cast<AST::While*>(t) != nullptr;
+}
+
+llvm::Value* GetOrigin(std::string name) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+		return CodeGen::all_coms[name]->origin;
+	}
+
+	if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
+		return CodeGen::all_mems[name]->origin;
+	}
+
+	return nullptr;
 }
 
 llvm::Value* AST::While::codegen() {
@@ -245,6 +274,25 @@ llvm::Value* AST::While::codegen() {
 	llvm::BasicBlock* LoopBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "while", TheFunction);
 	llvm::BasicBlock* ContinueBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "continue");
 
+	for(auto const& i : loop_body) {
+
+		if(i->target != nullptr) {
+
+			if(dynamic_cast<AST::Variable*>(i->target.get()) != nullptr) {
+
+				auto T = dynamic_cast<AST::Variable*>(i->target.get());
+
+				for(auto const& inits : T->initializers) {
+
+					inits->codegen();
+					AST::SaveState(inits->name, EntryBlock);
+				}
+
+				i->target->areInitializersGenerated = true;
+			}
+		}
+	}
+
 	CodeGen::Builder->CreateCondBr(conditionCodegen, LoopBlock, ContinueBlock);
 
 	CodeGen::Builder->SetInsertPoint(LoopBlock);
@@ -256,9 +304,9 @@ llvm::Value* AST::While::codegen() {
 
 	for(auto const& i: loop_body) {
 
-		AST::SaveState(i->name, EntryBlock);
-
 		bool isNotAVar = AST::IsInitializer(i.get()) || AST::IsAlgorithm(i.get()) || GetAllocaFromMem(i.get()) != nullptr;
+
+		AST::SaveState(i->name, EntryBlock);
 
 		if(!isNotAVar) {
 
@@ -269,19 +317,36 @@ llvm::Value* AST::While::codegen() {
 				CodeGen::Builder->SetInsertPoint(LoopBlock, LoopBlock->begin());
 	
 				auto entry = AST::FindExistingState(i->name, EntryBlock);
-	
-				auto phi = CodeGen::Builder->CreatePHI(entry->getType(), 2, "phi");
-	
-				phi->addIncoming(entry, LoopBlock);
-				phi->addIncoming(entry, EntryBlock);
 
-				CodeGen::AddPHINodeToVec(phi);
+				bool isPHICorrect = true;
 
-				allPHIs[i->name] = phi;
+				//if(dyn_cast<llvm::Instruction>(entry) != nullptr) {
+				//	auto c = dyn_cast<llvm::Instruction>(entry);
+
+				//	if(c->getParent() != EntryBlock) {
+				//		isPHICorrect = false;
+				//	}
+				//}
+		
+				if(isPHICorrect) {
+
+					auto phi = CodeGen::Builder->CreatePHI(entry->getType(), 2, "phi");
+
+					phi->addIncoming(entry, LoopBlock);
+					phi->addIncoming(entry, EntryBlock);
 	
-				CodeGen::Builder->SetInsertPoint(currentBlock);
+					CodeGen::AddPHINodeToVec(phi);
 	
-				AST::AddInstruction(i.get(), allPHIs[i->name]);
+					allPHIs[i->name] = phi;
+		
+					CodeGen::Builder->SetInsertPoint(currentBlock);
+		
+					AST::AddInstruction(i.get(), allPHIs[i->name]);
+				}
+				else {
+
+					CodeGen::Builder->SetInsertPoint(currentBlock);
+				}
 			}
 		}
 
@@ -487,7 +552,7 @@ void AST::AddInstruction(AST::Expression* e, llvm::Value* l) {
 
 void AST::AddInstructionToName(std::string name, llvm::Value* l) {
 
-	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+	if(CodeGen::all_mems.find(name) == CodeGen::all_mems.end() && name != "") {
 		CodeGen::all_coms[name]->current = l;
 	}
 }
@@ -544,6 +609,8 @@ llvm::Value* AST::FindExistingState(std::string name, llvm::BasicBlock* bb) {
 			return CodeGen::all_coms[name]->states[bbName];
 		}
 	}
+
+	//std::cout << name << " not found!\n";
 
 	return nullptr;
 }
