@@ -88,9 +88,13 @@ struct X86AssemblyParser {
 
 			X86AssemblyLexer::GetNextToken();
 
-			std::string pointerName = X86AssemblyLexer::NumValString + "(%rbp)";
+			std::string basePointer = X86AssemblyLexer::IdentifierStr;
 
-			if(X86AssemblyLexer::IdentifierStr == "%rbp") {
+			std::string pointerName = X86AssemblyLexer::NumValString + "(" + basePointer + ")";
+
+			if(X86AssemblyLexer::IdentifierStr[X86AssemblyLexer::IdentifierStr.size() - 2] == 'b' &&
+			 X86AssemblyLexer::IdentifierStr[X86AssemblyLexer::IdentifierStr.size() - 1] == 'p') {
+
 				AddStackMemory(pointerName);
 			}
 
@@ -125,9 +129,30 @@ struct X86AssemblyParser {
 		return comp;
 	}
 
-	static std::unique_ptr<X86AssemblyAST::Expression> ParseFunction(std::string name) {
+	static std::vector<std::unique_ptr<X86AssemblyAST::Expression>> CreateContentVector(std::string name) {
 
-		X86AssemblyLexer::GetNextToken();
+		auto CF = ParseFunction(name, true);
+
+		auto cfcast = dynamic_cast<X86AssemblyAST::Function*>(CF.get());
+
+		if(cfcast == nullptr) {
+			std::cout << "Error: 'CF' is not a function.\n";
+			exit(1);
+		}
+
+		astRegisters = std::move(cfcast->registers);
+		stackMemory = std::move(cfcast->stack);
+
+		std::cout << "Content Vector Created! Size: " << cfcast->instructions.size() << ".\n";
+
+		return std::move(cfcast->instructions);
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseFunction(std::string name, bool is_vector = false) {
+
+		if(!is_vector) {
+			X86AssemblyLexer::GetNextToken();
+		}
 
 		std::vector<std::unique_ptr<X86AssemblyAST::Expression>> allInstructions;
 
@@ -137,6 +162,8 @@ struct X86AssemblyParser {
 		bool isWhileLoop = false;
 
 		std::unique_ptr<X86AssemblyAST::If> lastIf = nullptr;
+
+		bool freezeLastIfSearch = false;
 
 		int ifIdCount = 0;
 
@@ -163,16 +190,25 @@ struct X86AssemblyParser {
 			if(X86AssemblyAST::IsJumpRecursive(Expr.get(), name)) {
 				isWhileLoop = true;
 				sendInstruction = false;
+				break;
 			}
 
 			if(dynamic_cast<X86AssemblyAST::If*>(Expr.get()) != nullptr) {
 
 				X86AssemblyAST::If* getIf = dynamic_cast<X86AssemblyAST::If*>(Expr.get());
 
-				lastIf = getIf->CloneToIf();
+				if(!freezeLastIfSearch) {
 
-				lastIf->ifId = ifIdCount;
-				Expr->ifId = ifIdCount;
+					lastIf = getIf->CloneToIf();
+
+					lastIf->ifId = ifIdCount;
+					Expr->ifId = ifIdCount;
+
+					if(lastIf->conditionBlockName == name) {
+						isWhileLoop = true;
+						break;
+					}
+				}
 
 				ifIdCount += 1;
 			}
@@ -194,18 +230,20 @@ struct X86AssemblyParser {
 				return nullptr;
 			}
 
-			lastIf->cmpType = GetOppositeComparator(lastIf->cmpType);
+			if(!freezeLastIfSearch) {
+				lastIf->cmpType = GetOppositeComparator(lastIf->cmpType);
+			}
 
-			return std::make_unique<X86AssemblyAST::While>(std::move(lastIf), std::move(allInstructions));
+			return std::make_unique<X86AssemblyAST::While>(std::move(lastIf), std::move(allInstructions), freezeLastIfSearch);
 		}
 
-		if(isInJmpList) {
+		if(isInJmpList || is_vector) {
 
 			auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(name, std::move(allInstructions));
 
 			X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
 
-			return std::make_unique<X86AssemblyAST::DoNothing>();
+			return std::make_unique<X86AssemblyAST::DoNothing>(name);
 		}
 
 		return std::make_unique<X86AssemblyAST::Function>(name, attrs, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
@@ -268,6 +306,32 @@ struct X86AssemblyParser {
 		auto Two = ParseExpression();
 
 		return std::make_unique<X86AssemblyAST::Sub>(std::move(One), std::move(Two));
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseXor() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto One = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in Assembly file.\n";
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Two = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Xor>(std::move(One), std::move(Two));
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseIncrement() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto Expr = ParseExpression();
+
+		return std::make_unique<X86AssemblyAST::Add>(std::make_unique<X86AssemblyAST::IntNumber>(1), std::move(Expr));
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseMov() {
@@ -548,18 +612,70 @@ struct X86AssemblyParser {
 
 		auto B = ParseExpression();
 
-		if(X86AssemblyLexer::IsIdentifier("jge")) {
+		if(X86AssemblyLexer::IdentifierStr[0] == 'j') {
+
+			std::string jmp = X86AssemblyLexer::IdentifierStr;
 
 			X86AssemblyLexer::GetNextToken();
 
-			conditionJumpList.push_back(X86AssemblyLexer::IdentifierStr);
+			std::string jumpName = X86AssemblyLexer::IdentifierStr;
+			conditionJumpList.push_back(jumpName);
 
 			X86AssemblyLexer::GetNextToken();
 
-			return std::make_unique<X86AssemblyAST::If>(std::move(A), std::move(B), "jge", conditionJumpList[conditionJumpList.size() - 1]);
+			std::string elseJumpName = "";
+			if(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && !X86AssemblyLexer::IsIdentifierMetadata()) {
+
+				auto elseBlock = ParseFunction(std::string("else") + std::to_string(conditionJumpList.size()), true);
+				elseJumpName = elseBlock->name;
+				conditionJumpList.push_back(elseJumpName);
+			}
+
+			return std::make_unique<X86AssemblyAST::If>(std::move(A), std::move(B), jmp, jumpName, elseJumpName);
 		}
 
 		return std::make_unique<X86AssemblyAST::Comment>("Not all jump conditions are currently supported yet.");
+	}
+
+	static std::unique_ptr<X86AssemblyAST::Expression> ParseTest() {
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto A = ParseExpression();
+
+		if(X86AssemblyLexer::CurrentToken != ',') {
+			std::cout << "Expected ',' in 'test'.\n";
+			exit(1);
+			return nullptr;
+		}
+
+		X86AssemblyLexer::GetNextToken();
+
+		auto B = ParseExpression();
+
+		if(X86AssemblyLexer::IdentifierStr[0] == 'j') {
+
+			std::string jmp = X86AssemblyLexer::IdentifierStr;
+
+			X86AssemblyLexer::GetNextToken();
+
+			std::string jumpName = X86AssemblyLexer::IdentifierStr;
+			conditionJumpList.push_back(jumpName);
+
+			X86AssemblyLexer::GetNextToken();
+
+			std::string elseJumpName = "";
+			if(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && !X86AssemblyLexer::IsIdentifierMetadata()) {
+
+				auto elseBlock = ParseFunction(std::string("else") + std::to_string(conditionJumpList.size()), true);
+				elseJumpName = elseBlock->name;
+				conditionJumpList.push_back(elseJumpName);
+			}
+
+			return std::make_unique<X86AssemblyAST::If>(std::make_unique<X86AssemblyAST::IntNumber>(0), std::move(B), jmp, jumpName, elseJumpName);
+		}
+
+		return std::make_unique<X86AssemblyAST::Comment>("Not all test conditions are currently supported yet.");
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseJump() {
@@ -580,6 +696,8 @@ struct X86AssemblyParser {
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Add) { return ParseAdd(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Sub) { return ParseSub(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Xor) { return ParseXor(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Inc) { return ParseIncrement(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Lea) { return ParseLea(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Push) { return ParsePush(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Pop) { return ParsePop(); }
@@ -587,6 +705,7 @@ struct X86AssemblyParser {
 
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Mov) { return ParseMov(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Cmp) { return ParseCompare(); }
+		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Test) { return ParseTest(); }
 		
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86Jmp) { return ParseJump(); }
 
@@ -615,6 +734,7 @@ struct X86AssemblyParser {
 		std::string res = "";
 
 		if(Expr != nullptr) {
+
 			res += Expr->codegen();
 			res += "\n";
 		}

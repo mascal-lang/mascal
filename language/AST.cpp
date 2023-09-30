@@ -167,6 +167,20 @@ llvm::Value* AST::Sub::codegen() {
 	return result;
 }
 
+llvm::Value* AST::Xor::codegen() {
+
+	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
+	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
+
+	std::string finalName = std::string("xor") + target->name;
+
+	llvm::Value* result = CodeGen::Builder->CreateXor(L, R, finalName.c_str());
+
+	AST::AddInstruction(target.get(), result);
+
+	return result;
+}
+
 llvm::Value* AST::IntCast::codegen() {
 
 	llvm::Value* targetC = AST::GetOrCreateInstruction(target.get());
@@ -381,6 +395,8 @@ llvm::Value* AST::While::codegen() {
 		CodeGen::AddPHINodeToVec(finalPHI);
 
 		AST::AddInstructionToName(it->first, finalPHI);
+
+		AST::SaveState(it->first, ContinueBlock);
 	}
 
 	return nullptr;
@@ -529,6 +545,8 @@ llvm::Value* AST::GetCurrentInstructionByName(std::string name) {
 	CodeGen::AddPHINodeToVec(newPhi);
 
 	AST::AddInstructionToName(name, newPhi);
+
+	//AST::SaveState(name, CodeGen::Builder->GetInsertBlock());
 
 	return newPhi;
 }

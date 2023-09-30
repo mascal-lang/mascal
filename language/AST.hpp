@@ -457,6 +457,63 @@ struct AST {
 		}
 	};
 
+	struct Xor : public Expression {
+
+		EXPR_OBJ() value;
+
+		Xor(EXPR_OBJ() target_in, EXPR_OBJ() value_in) {
+
+			target = std::move(target_in);
+			value = std::move(value_in);
+
+			name = target->name;
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			if(value->ToLLMascalBefore() != "") {
+
+				res += value->ToLLMascalBefore();
+				res += "\n";
+				res += GetSlashT();
+			}
+
+			res += "xor ";
+			res += target->ToLLMascal();
+			res += ", ";
+			res += value->ToLLMascal();
+			res += ";";
+
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		bool ContainsName(std::string str) override {
+
+			return name == str || target->ContainsName(str) || value->ContainsName(str);
+		}
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+
+			target->ReplaceTargetNameTo(from, to);
+			value->ReplaceTargetNameTo(from, to);
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<Xor>(target->Clone(), value->Clone());
+		}
+	};
+
 	struct IntCast : public Expression {
 
 		TYPE_OBJ() intType;

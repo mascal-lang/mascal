@@ -1,6 +1,9 @@
 #include "X86AssemblyAST.hpp"
+#include <iostream>
 
 std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> X86AssemblyAST::allConditionBlocks;
+
+int X86AssemblyAST::slash_t_count = 0;
 
 std::string X86AssemblyAST::Variable::codegen() {
 
@@ -64,30 +67,49 @@ std::string X86AssemblyAST::Function::codegen() {
 		res += "() begin\n";
 	}
 
+	slash_t_count += 1;
+
 	for(auto const& i : registers) {
 
-		res += "\t";
-		res += i->codegen();
-		res += ";\n";
+		std::string regCG = i->codegen();
+
+		if(regCG != "") {
+
+			res += GetSlashT();
+			res += regCG;
+			res += ";\n";
+		}
 	}
 
 	for(auto const& i : stack) {
 
-		res += "\t";
-		res += i->codegen();
-		res += ";\n";
+		std::string staCG = i->codegen();
+
+		if(staCG != "") {
+			
+			res += GetSlashT();
+			res += staCG;
+			res += ";\n";
+		}
 	}
 
 	for(auto const& i : instructions) {
 
-		res += "\t";
-		res += i->codegen();
-		res += ";\n";
+		std::string insCG = i->codegen();
+
+		if(insCG != "") {
+			
+			res += GetSlashT();
+			res += insCG;
+			res += ";\n";
+		}
 	}
 
-	if(dynamic_cast<X86AssemblyAST::Return*>(instructions[instructions.size() - 1].get()) == nullptr) {
-		res += "return eax;\n";
+	if(name == "main" && dynamic_cast<X86AssemblyAST::Return*>(instructions[instructions.size() - 1].get()) == nullptr) {
+		res += GetSlashT() + "return eax;\n";
 	}
+
+	slash_t_count -= 1;
 
 	res += "end\n";
 
@@ -119,6 +141,22 @@ std::string X86AssemblyAST::Sub::codegen() {
 	}
 
 	res += "sub ";
+	res += target->codegen();
+	res += ", ";
+	res += value->codegen();
+
+	return res;
+}
+
+std::string X86AssemblyAST::Xor::codegen() {
+
+	std::string res;
+
+	//if(X86AssemblyAST::IsStackPointer(target->name)) {
+	//	return std::string("# [Assembly]: Reserve '") + value->codegen() + std::string("' bytes for local variables.");
+	//}
+
+	res += "xor ";
 	res += target->codegen();
 	res += ", ";
 	res += value->codegen();
@@ -232,16 +270,25 @@ std::string X86AssemblyAST::P2Align::codegen() {
 	return res;
 }
 
-std::string JumpInstructionToCompare(std::string comp) {
+std::string JumpInstructionToCompare(std::string comp, bool& is_second_param_zero) {
 
-	if(comp == "jge") { return "IsMoreThanOrEquals"; }
-	if(comp == "jle") { return "IsLessThanOrEquals"; }
+	if(comp == "jge") { is_second_param_zero = false; return "IsMoreThanOrEquals"; }
+	if(comp == "jle") { is_second_param_zero = false; return "IsLessThanOrEquals"; }
 
-	if(comp == "jg") { return "IsMoreThan"; }
-	if(comp == "jl") { return "IsLessThan"; }
+	if(comp == "jg") { is_second_param_zero = false; return "IsMoreThan"; }
+	if(comp == "jl") { is_second_param_zero = false; return "IsLessThan"; }
 
-	if(comp == "je") { return "IsEquals"; }
-	if(comp == "jne") { return "IsNotEquals"; }
+	if(comp == "je") { is_second_param_zero = false; return "IsEquals"; }
+	if(comp == "jne") { is_second_param_zero = false; return "IsNotEquals"; }
+
+	if(comp == "jz") { is_second_param_zero = true; return "IsEquals"; }
+	if(comp == "jnz") { is_second_param_zero = true; return "IsNotEquals"; }
+
+	if(comp == "js") { is_second_param_zero = true; return "IsMoreThan"; }
+	if(comp == "jns") { is_second_param_zero = true; return "IsLessThan"; }
+
+	if(comp == "ja") { is_second_param_zero = true; return "IsMoreThan"; }
+	if(comp == "jb") { is_second_param_zero = true; return "IsLessThan"; }
 
 	return "";
 }
@@ -252,18 +299,43 @@ std::string X86AssemblyAST::If::codegen() {
 
 	res += "if COMPARE.";
 
-	res += JumpInstructionToCompare(cmpType);
+	bool is_second_param_zero = false;
+
+	res += JumpInstructionToCompare(cmpType, is_second_param_zero);
 	res += "(";
 
 	res += B->codegen();
 	res += ", ";
-	res += A->codegen();
+
+	if(!is_second_param_zero) {
+		res += A->codegen();
+	}
+	else {
+		res += "0";
+	}
 
 	res += ") then\n";
 
+	slash_t_count += 1;
+
 	res += X86AssemblyAST::GetConditionBlock(conditionBlockName)->codegen();
 
-	res += "\tend";
+	slash_t_count -= 1;
+
+	if(elseConditionBlockName.size() != 0) {
+
+		std::cout << "Generating Else...\n";
+
+		res += GetSlashT() + "else then\n";
+
+		slash_t_count += 1;
+
+		res += X86AssemblyAST::GetConditionBlock(elseConditionBlockName)->codegen();
+
+		slash_t_count -= 1;
+	}
+
+	res += GetSlashT() + "end";
 
 	return res;
 }
@@ -274,7 +346,9 @@ std::string X86AssemblyAST::While::codegen() {
 
 	res += "while COMPARE.";
 
-	res += JumpInstructionToCompare(cmp->cmpType);
+	bool is_second_param_zero = false;
+
+	res += JumpInstructionToCompare(cmp->cmpType, is_second_param_zero);
 	res += "(";
 
 	res += cmp->B->codegen();
@@ -283,19 +357,49 @@ std::string X86AssemblyAST::While::codegen() {
 
 	res += ") do\n";
 
+	slash_t_count += 1;
+
+	std::cout << "Generating While...\n";
+
 	for(auto const& i : instructions) {
 
+		std::cout << "Generating Instruction... (i->ifId: " << i->ifId << ", cmp->ifId: " << cmp->ifId << ")\n";
+
 		if(i->ifId != cmp->ifId) {
-			
-			res += "\t";
-			res += i->codegen();
-			res += ";\n";
+
+			std::cout << "Instruction Accepted! (i->ifId: " << i->ifId << ", cmp->ifId: " << cmp->ifId << ")\n";
+
+			std::string insCG = i->codegen();
+
+			if(insCG != "") {
+				
+				res += GetSlashT();
+				res += insCG;
+				res += ";\n";
+			}
 		}
 	}
 
-	res += "end;\n";
+	slash_t_count -= 1;
 
-	res += X86AssemblyAST::GetConditionBlock(cmp->conditionBlockName)->codegen();
+	if(is_haskell_style) {
+
+		res += GetSlashT() + "end;\n";
+
+		res += X86AssemblyAST::GetConditionBlock(cmp->conditionBlockName)->codegen();
+	
+		if(res[res.size() - 1] == '\n') {
+			res.pop_back();
+		}
+	
+		if(res[res.size() - 1] == ';') {
+			res.pop_back();
+		}
+	}
+	else {
+
+		res += GetSlashT() + "end";
+	}
 
 	return res;
 }
@@ -306,9 +410,14 @@ std::string X86AssemblyAST::ConditionBlock::codegen() {
 
 	for(auto const& i : instructions) {
 
-		res += "\t";
-		res += i->codegen();
-		res += ";\n";
+		std::string insCG = i->codegen();
+
+		if(insCG != "") {
+			
+			res += GetSlashT();
+			res += insCG;
+			res += ";\n";
+		}
 
 	}
 

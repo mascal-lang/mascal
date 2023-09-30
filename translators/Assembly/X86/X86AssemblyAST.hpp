@@ -16,6 +16,19 @@ for(auto const& i: x) {\
 
 struct X86AssemblyAST {
 
+	static int slash_t_count;
+
+	static std::string GetSlashT() {
+
+		std::string res;
+
+		for(int i = 0; i < slash_t_count; i++) {
+			res += '\t';
+		}
+
+		return res;
+	}
+
 	struct Expression {
 
 		std::string name;
@@ -232,6 +245,25 @@ struct X86AssemblyAST {
 		std::string codegen() override;
 	};
 
+	struct Xor : public Expression {
+
+		std::unique_ptr<Expression> value;
+		std::unique_ptr<Expression> target;
+
+		Xor(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
+
+			value = std::move(value_in);
+			target = std::move(target_in);
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<Xor>(value->Clone(), target->Clone());
+		}
+
+		std::string codegen() override;
+	};
+
 	struct Mov : public Expression {
 
 		std::unique_ptr<Expression> value;
@@ -443,7 +475,10 @@ struct X86AssemblyAST {
 
 	struct DoNothing : public Expression {
 
-		DoNothing() {}
+		DoNothing(std::string name_in = "") {
+
+			name = name_in;
+		}
 
 		std::string codegen() override {
 			return "";
@@ -451,7 +486,7 @@ struct X86AssemblyAST {
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<DoNothing>();
+			return std::make_unique<DoNothing>(name);
 		}
 	};
 
@@ -488,31 +523,55 @@ struct X86AssemblyAST {
 		return nullptr;
 	};
 
-	struct If : public Expression {
+	/*
+	struct TestVar : public Expression {
 
-		std::unique_ptr<Expression> A;
-		std::unique_ptr<Expression> B;
-		std::string cmpType;
-		std::string conditionBlockName;
+		std::unique_ptr<Expression> secondTarget;
 
-		If(std::unique_ptr<Expression> A_in, std::unique_ptr<Expression> B_in, std::string cmpType_in, std::string conditionBlockName_in) {
+		TestVar(std::string name_in, std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> secondTarget_in) {
 
-			A = std::move(A_in);
-			B = std::move(B_in);
-			cmpType = cmpType_in;
-			conditionBlockName = conditionBlockName_in;
+			name = name_in;
+			target = std::move(target_in);
+			secondTarget = std::move(secondTarget_in);
+
 		}
 
 		std::string codegen() override;
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
+			return std::make_unique<TestVar>(name, target->Clone(), secondTarget->Clone());
+		}
+	}
+	*/
+
+	struct If : public Expression {
+
+		std::unique_ptr<Expression> A;
+		std::unique_ptr<Expression> B;
+		std::string cmpType;
+		std::string conditionBlockName;
+		std::string elseConditionBlockName;
+
+		If(std::unique_ptr<Expression> A_in, std::unique_ptr<Expression> B_in, std::string cmpType_in, std::string conditionBlockName_in, std::string elseConditionBlockName_in) {
+
+			A = std::move(A_in);
+			B = std::move(B_in);
+			cmpType = cmpType_in;
+			conditionBlockName = conditionBlockName_in;
+			elseConditionBlockName = elseConditionBlockName_in;
+		}
+
+		std::string codegen() override;
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName, elseConditionBlockName);
 		}
 
 		std::unique_ptr<If> CloneToIf() {
 
-			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName, elseConditionBlockName);
 		}
 	};
 
@@ -520,11 +579,13 @@ struct X86AssemblyAST {
 
 		std::unique_ptr<If> cmp;
 		std::vector<std::unique_ptr<Expression>> instructions;
+		bool is_haskell_style;
 
-		While(std::unique_ptr<If> cmp_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
+		While(std::unique_ptr<If> cmp_in, std::vector<std::unique_ptr<Expression>> instructions_in, bool is_haskell_style_in) {
 
 			cmp = std::move(cmp_in);
 			instructions = std::move(instructions_in);
+			is_haskell_style = is_haskell_style_in;
 		}
 
 		std::string codegen() override;
@@ -533,7 +594,7 @@ struct X86AssemblyAST {
 
 			CLONE_X86EXPR_VECTOR(instructions, clone_instructions)
 
-			return std::make_unique<While>(cmp->CloneToIf(), std::move(clone_instructions));
+			return std::make_unique<While>(cmp->CloneToIf(), std::move(clone_instructions), is_haskell_style);
 		}
 	};
 

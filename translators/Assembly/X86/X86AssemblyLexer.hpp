@@ -13,28 +13,31 @@ enum X86AssemblyToken {
 
 	X86Add = -4,
 	X86Sub = -5,
-	X86Mov = -6,
-	X86Return = -7,
-	X86Cmp = -8,
-	X86Jmp = -9,
+	X86Xor = -6,
+	X86Inc = -7,
+	X86Mov = -8,
+	X86Return = -9,
+	X86Cmp = -10,
+	X86Test = -11,
+	X86Jmp = -12,
 
-	X86Push = -10,
-	X86Pop = -11,
-	X86Lea = -12,
-	X86Call = -13,
+	X86Push = -13,
+	X86Pop = -14,
+	X86Lea = -15,
+	X86Call = -16,
 
-	X86Text = -14,
-	X86Def = -15,
-	X86Globl = -16,
-	X86Set = -17,
-	X86File = -18,
-	X86P2Align = -19,
+	X86Text = -17,
+	X86Def = -18,
+	X86Globl = -19,
+	X86Set = -20,
+	X86File = -21,
+	X86P2Align = -22,
 
-	X86String = -20,
+	X86String = -23,
 
-	X86SEH = -21,
-	X86SEHEnd = -22,
-	X86SEHSetFrame = -23,
+	X86SEH = -24,
+	X86SEHEnd = -25,
+	X86SEHSetFrame = -26,
 };
 
 struct X86AssemblyLexer {
@@ -165,6 +168,19 @@ struct X86AssemblyLexer {
 		IsIdentifier(bit80version);
 	}
 
+	static bool IsIdentifierMetadata() {
+
+		return CurrentToken == X86AssemblyToken::X86Text ||
+		CurrentToken == X86AssemblyToken::X86Def ||
+		CurrentToken == X86AssemblyToken::X86Globl ||
+		CurrentToken == X86AssemblyToken::X86Set ||
+		CurrentToken == X86AssemblyToken::X86File ||
+		CurrentToken == X86AssemblyToken::X86P2Align ||
+		CurrentToken == X86AssemblyToken::X86SEHSetFrame ||
+		CurrentToken == X86AssemblyToken::X86SEH ||
+		CurrentToken == X86AssemblyToken::X86SEHEnd;
+	}
+
 	static int GetIdentifier() {
 
 		IdentifierStr = LastChar;
@@ -175,8 +191,9 @@ struct X86AssemblyLexer {
 		}
 
 		if(IsMultipleBitIdentifier("add")) return X86AssemblyToken::X86Add;
-
 		else if(IsMultipleBitIdentifier("sub")) return X86AssemblyToken::X86Sub;
+		else if(IsMultipleBitIdentifier("xor")) return X86AssemblyToken::X86Xor;
+		else if(IsMultipleBitIdentifier("inc")) return X86AssemblyToken::X86Inc;
 		else if(IsMultipleBitIdentifier("lea")) return X86AssemblyToken::X86Lea;
 		else if(IsMultipleBitIdentifier("call")) return X86AssemblyToken::X86Call;
 		else if(IsMultipleBitIdentifier("pop")) return X86AssemblyToken::X86Pop;
@@ -185,6 +202,7 @@ struct X86AssemblyLexer {
 
 		else if(IsMultipleBitIdentifier("mov")) return X86AssemblyToken::X86Mov;
 		else if(IsMultipleBitIdentifier("cmp")) return X86AssemblyToken::X86Cmp;
+		else if(IsMultipleBitIdentifier("test")) return X86AssemblyToken::X86Test;
 
 		else if(IsIdentifier("jmp")) return X86AssemblyToken::X86Jmp;
 

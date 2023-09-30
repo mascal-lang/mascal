@@ -394,6 +394,23 @@ struct Parser {
 		return std::make_unique<AST::Sub>(UnverifyMem(std::move(target)), MemTreatment(std::move(value)));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseXor() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::Xor>(UnverifyMem(std::move(target)), MemTreatment(std::move(value)));
+	}
+
 	static int TextToCompareType(std::string t) {
 
 		/*
@@ -662,6 +679,7 @@ struct Parser {
 
 		else if(Lexer::CurrentToken == Token::Add) 		{ return ParseAdd(); }
 		else if(Lexer::CurrentToken == Token::Sub) 		{ return ParseSub(); }
+		else if(Lexer::CurrentToken == Token::Xor) 		{ return ParseXor(); }
 
 		else if(Lexer::CurrentToken == Token::Compare) 	{ return ParseCompare(); }
 
