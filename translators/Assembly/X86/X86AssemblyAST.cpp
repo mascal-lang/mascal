@@ -340,6 +340,15 @@ std::string X86AssemblyAST::If::codegen() {
 	return res;
 }
 
+std::string X86AssemblyAST::Jump::codegen() {
+
+	//if(generateJumpBlock) {
+	//	return X86AssemblyAST::GetConditionBlock(name)->codegen();
+	//}
+
+	return "";
+}
+
 std::string X86AssemblyAST::While::codegen() {
 
 	std::string res;

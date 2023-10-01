@@ -600,13 +600,13 @@ struct X86AssemblyAST {
 
 	struct Jump : public Expression {
 
+		std::string jumpBlockName;
+
 		Jump(std::string to) {
 			name = to;
 		}
 
-		std::string codegen() override {
-			return "";
-		}
+		std::string codegen() override;
 
 		std::unique_ptr<Expression> Clone() override {
 
