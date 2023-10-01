@@ -241,16 +241,16 @@ struct X86AssemblyParser {
 
 			return std::make_unique<X86AssemblyAST::While>(std::move(lastIf), std::move(allInstructions), freezeLastIfSearch);
 		}
-		else if(lastIf != nullptr) {
+		//else if(lastIf != nullptr) {
 
-			auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(std::string("else") + std::to_string(X86AssemblyAST::allConditionBlocks.size()), std::move(allInstructions));
+		//	auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(std::string("else") + std::to_string(X86AssemblyAST::allConditionBlocks.size()), std::move(allInstructions));
 
-			lastIf->elseConditionBlockName = CBlock->name;
+		//	lastIf->elseConditionBlockName = CBlock->name;
 
-			X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
+		//	X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
 
-			return std::make_unique<X86AssemblyAST::DoNothing>();
-		}
+		//	return std::make_unique<X86AssemblyAST::DoNothing>();
+		//}
 
 		if(isInJmpList || is_vector) {
 
