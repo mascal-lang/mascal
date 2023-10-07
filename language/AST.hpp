@@ -1203,6 +1203,11 @@ struct AST {
 
 	static bool IsInitializer(AST::Expression* t);
 	static bool IsAlgorithm(AST::Expression* t);
+
+	static bool IsInstructionInsideOfBlock(llvm::BasicBlock* bb, llvm::Value* v);
+
+	static llvm::Value* GetOrigin(std::string name);
+	static llvm::Value* GetCurrent(std::string name);
 };
 
 #endif

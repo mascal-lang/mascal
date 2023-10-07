@@ -6,7 +6,7 @@
 
 #define NEW_X86_TYPE(x) struct x : public Type { std::string codegen() override; std::unique_ptr<Type> Clone() override { return std::make_unique<x>(); } }
 
-#define CLONE_X86EXPR_VECTOR(x, y) std::vector<std::unique_ptr<Expression>> y; for(auto const& i: x) { auto z = i->Clone(); y.push_back(std::move(z)); }
+#define CLONE_X86EXPR_VECTOR(x, y) std::vector<std::unique_ptr<X86AssemblyAST::Expression>> y; for(auto const& i: x) { auto z = i->Clone(); y.push_back(std::move(z)); }
 
 #define CLONE_X86RAM_VECTOR(x, y) std::vector<std::unique_ptr<RAM>> y;\
 for(auto const& i: x) {\

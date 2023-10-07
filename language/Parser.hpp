@@ -493,7 +493,11 @@ struct Parser {
 		std::vector<std::unique_ptr<AST::Expression>> if_body;
 		std::vector<std::unique_ptr<AST::Expression>> else_body;
 
+		MemVerifyAll();
+
 		while(Lexer::CurrentToken != Token::End && Lexer::CurrentToken != Token::Else) {
+
+			ResetMainTarget();
 
 			std::unique_ptr<AST::Expression> e = ParseExpression();
 
@@ -501,10 +505,10 @@ struct Parser {
 
 			if_body.push_back(std::move(e));
 
-			ResetMainTarget();
-
 			Lexer::GetNextToken();
 		}
+
+		MemVerifyAll();
 
 		if(Lexer::CurrentToken == Token::Else) {
 
@@ -521,13 +525,13 @@ struct Parser {
 
 				while(Lexer::CurrentToken != Token::End) {
 
+					ResetMainTarget();
+
 					std::unique_ptr<AST::Expression> e = ParseExpression();
 
 					if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside else block."); }
 		
 					else_body.push_back(std::move(e));
-		
-					ResetMainTarget();
 		
 					Lexer::GetNextToken();
 				}
@@ -557,7 +561,11 @@ struct Parser {
 
 		std::unique_ptr<AST::Expression> value = ParseExpression();
 
-		return std::make_unique<AST::ComStore>(std::move(target), MemTreatment(std::move(value)));
+		value = MemTreatment(std::move(value));
+
+		std::cout << "ComStore >> Target Name: '" << target->name << "'. Value Name: '" << value->name << "'.\n";
+
+		return std::make_unique<AST::ComStore>(std::move(target), std::move(value));
 	}
 
 	static std::unique_ptr<AST::Expression> ParseMemStore() {
@@ -629,12 +637,7 @@ struct Parser {
 
 		std::vector<std::string> verifyMemAtEnd;
 
-		UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<Parser_Mem>, all_parser_mems, it) {
-
-			it->second->loadVariableName.clear();
-
-			it->second->is_verified = true;
-		}
+		MemVerifyAll();
 
 		while(Lexer::CurrentToken != Token::End) {
 
@@ -739,6 +742,16 @@ struct Parser {
 		initStore.push_back(std::make_unique<AST::MemStore>(std::move(V), std::make_unique<AST::Variable>(getLoadName)));
 
 		return Mem_CreateAutoLoad(std::make_unique<AST::Variable>(getVName), std::move(initStore));
+	}
+
+	static void MemVerifyAll() {
+
+		UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<Parser_Mem>, Parser::all_parser_mems, it) {
+
+			it->second->loadVariableName.clear();
+
+			it->second->is_verified = true;
+		}
 	}
 
 	static std::unique_ptr<AST::Expression> Mem_Verify(std::unique_ptr<AST::Expression> V) {

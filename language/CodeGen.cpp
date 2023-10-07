@@ -1,4 +1,6 @@
 #include "CodeGen.hpp"
+#include "AST.hpp"
+#include <iostream>
 
 std::unique_ptr<llvm::LLVMContext> 	CodeGen::TheContext;
 std::unique_ptr<llvm::IRBuilder<>> 	CodeGen::Builder;
@@ -9,7 +11,7 @@ std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> CodeGen::all_mems;
 
 bool CodeGen::releaseMode = false;
 
-std::vector<llvm::PHINode*> CodeGen::all_phi_nodes;
+std::vector<std::pair<std::string, llvm::PHINode*>> CodeGen::all_phi_nodes;
 
 void CodeGen::Initialize()
 {
@@ -23,16 +25,16 @@ void CodeGen::Initialize()
  	Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
 }
 
-void CodeGen::AddPHINodeToVec(llvm::PHINode* p) {
+void CodeGen::AddPHINodeToVec(std::string name, llvm::PHINode* p) {
 
-	CodeGen::all_phi_nodes.push_back(p);
+	CodeGen::all_phi_nodes.push_back(std::make_pair(name, p));
 }
 
 void CodeGen::UpdateAllPHIPreds() {
 
 	for(auto i : CodeGen::all_phi_nodes) {
 
-		llvm::BasicBlock* parent = i->getParent();
+		llvm::BasicBlock* parent = i.second->getParent();
 
 		std::vector<llvm::BasicBlock*> blockPreds;
 
@@ -42,11 +44,65 @@ void CodeGen::UpdateAllPHIPreds() {
 			blockPreds.push_back(predecessor);
 		}
 
-		int bCount = 0;
 		for(auto b : blockPreds) {
+			auto V = AST::FindExistingState(i.first, b);
 
-			i->setIncomingBlock(bCount, blockPreds[bCount]);
-			bCount += 1;
+			if(!AST::IsInstructionInsideOfBlock(b, V)) {
+				V = AST::GetOrigin(i.first);
+			}
+
+			if(V == nullptr) {
+				std::cout << i.first << "'s state doesn't exist in block '" << std::string(b->getName()) << "'.\n";
+				exit(1);
+			}
+
+			i.second->addIncoming(V, b);
+		}
+	}
+}
+
+int CodeGen::GetParentId(std::string name, llvm::BasicBlock* bb) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+
+		int count = 0;
+
+		for(auto i : CodeGen::all_coms[name]->blockParents) {
+
+			if(i == bb) {
+				return count;
+			}
+
+			count += 1;
+		}
+	}
+
+	return -1;
+}
+
+void CodeGen::SetOriginBlock(std::string name) {
+
+	if(CodeGen::all_coms.find(name) != CodeGen::all_coms.end()) {
+		CodeGen::all_coms[name]->originBlock = CodeGen::Builder->GetInsertBlock();
+	}
+	else if(CodeGen::all_mems.find(name) != CodeGen::all_mems.end()) {
+		CodeGen::all_mems[name]->originBlock = CodeGen::Builder->GetInsertBlock();
+	}
+}
+
+void CodeGen::EndScope(llvm::BasicBlock* bb) {
+
+	UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<LLVM_Com>, CodeGen::all_coms, it) {
+
+		if(it->second->originBlock == bb) {
+			it->second->isOutOfScope = true;
+		}
+	}
+
+	UNORDERED_MAP_FOREACH(std::string, std::unique_ptr<LLVM_Mem>, CodeGen::all_mems, it) {
+
+		if(it->second->originBlock == bb) {
+			it->second->isOutOfScope = true;
 		}
 	}
 }

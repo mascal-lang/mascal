@@ -52,6 +52,12 @@ struct LLVM_Com {
 	llvm::Value* current;
 
 	std::unordered_map<std::string, llvm::Value*> states;
+
+	llvm::BasicBlock* originBlock;
+
+	bool isOutOfScope = false;
+
+	std::vector<llvm::BasicBlock*> blockParents;
 };
 
 struct LLVM_Mem {
@@ -60,6 +66,10 @@ struct LLVM_Mem {
 	llvm::Value* current;
 
 	llvm::Type* ty;
+
+	llvm::BasicBlock* originBlock;
+
+	bool isOutOfScope = false;
 
 	std::unordered_map<std::string, llvm::Value*> states;
 };
@@ -71,10 +81,16 @@ struct CodeGen {
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Com>> all_coms;
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> all_mems;
 
-	static std::vector<llvm::PHINode*> all_phi_nodes;
+	static std::vector<std::pair<std::string, llvm::PHINode*>> all_phi_nodes;
 
-	static void AddPHINodeToVec(llvm::PHINode* p);
+	static void AddPHINodeToVec(std::string name, llvm::PHINode* p);
 	static void UpdateAllPHIPreds();
+
+	static int GetParentId(std::string name, llvm::BasicBlock* bb);
+
+	static void SetOriginBlock(std::string name);
+
+	static void EndScope(llvm::BasicBlock* bb);
 
 	static std::unique_ptr<llvm::LLVMContext> TheContext;
 	static std::unique_ptr<llvm::IRBuilder<>> Builder;

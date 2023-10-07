@@ -76,21 +76,29 @@ struct X86AssemblyLexer {
 	static int Advance() {
 
 		Position += 1;
-		Column += 1;
+		//Column += 1;
 
-		line_as_string += Content[Position];
+		//line_as_string += Content[Position];
 
 		if (Content[Position] == '\n')
 		{
-			Line += 1;
-			Column = 1;
+			//Line += 1;
+			//Column = 1;
 
-			all_lines_vector.push_back(line_as_string);
+			//all_lines_vector.push_back(line_as_string);
 
-			line_as_string.clear();
+			//line_as_string.clear();
 		}
 
 		return Content[Position];
+	}
+
+	static void GoTo(int place) {
+
+		if(place < Content.size()) {
+
+			Position = place;
+		}
 	}
 
 	static void GetNextToken() {
