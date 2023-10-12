@@ -11,6 +11,7 @@ struct X86AssemblyParser {
 	static std::vector<std::unique_ptr<X86AssemblyAST::Expression>> astRegisters;
 	static std::vector<std::unique_ptr<X86AssemblyAST::RAM>> stackMemory;
 	static std::vector<std::string> conditionJumpList;
+	static std::vector<std::string> allRegisteredBlockNames;
 
 	static bool IsInConditionJumpList(std::string name) {
 
@@ -174,12 +175,32 @@ struct X86AssemblyParser {
 
 				v.push_back(std::move(elseBlock));
 
-				while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
-				X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp) {
+				while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier) {
 
 					auto E = ParseExpression();
 
-					v.push_back(std::move(E));
+					bool sendInstruction = true;
+					if(dynamic_cast<X86AssemblyAST::Jump*>(E.get()) != nullptr) {
+
+						bool blockAlreadyRegistered = false;
+
+						for(auto i : X86AssemblyParser::allRegisteredBlockNames) {
+							if(i == E->name) {
+								blockAlreadyRegistered = true;
+								break;
+							}
+						}
+
+						if(blockAlreadyRegistered) {
+							auto bRef = X86AssemblyAST::GetConditionBlock(E->name);
+							bRef->usesGoto = true;
+							sendInstruction = false;
+						}
+					}
+
+					if(sendInstruction) { 
+						v.push_back(std::move(E));
+					}
 				}
 
 				auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(vName, std::move(v));
@@ -200,6 +221,8 @@ struct X86AssemblyParser {
 		if(!dont_move) {
 			X86AssemblyLexer::GetNextToken();
 		}
+
+		X86AssemblyParser::allRegisteredBlockNames.push_back(name);
 
 		std::vector<std::unique_ptr<X86AssemblyAST::Expression>> allInstructions;
 

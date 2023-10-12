@@ -495,6 +495,8 @@ struct X86AssemblyAST {
 
 		std::vector<std::unique_ptr<Expression>> instructions;
 
+		bool usesGoto = false;
+
 		ConditionBlock(std::string name_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
 
 			name = name_in;

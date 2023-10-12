@@ -341,7 +341,15 @@ std::string X86AssemblyAST::If::codegen() {
 
 std::string X86AssemblyAST::Jump::codegen() {
 
-	return X86AssemblyAST::GetConditionBlock(name)->codegen();
+	auto GCB = X86AssemblyAST::GetConditionBlock(name);
+
+	if(!GCB->usesGoto) {
+		return GCB->codegen();
+	}
+
+	std::string gotoRes = "goto ";
+	gotoRes += name;
+	return gotoRes;
 }
 
 std::string X86AssemblyAST::While::codegen() {
@@ -410,6 +418,14 @@ std::string X86AssemblyAST::ConditionBlock::codegen() {
 
 	std::string res;
 
+	if(usesGoto) {
+		res += "block ";
+		res += name;
+		res += " begin\n";
+
+		slash_t_count += 1;
+	}
+
 	for(auto const& i : instructions) {
 
 		std::string insCG = i->codegen();
@@ -421,6 +437,11 @@ std::string X86AssemblyAST::ConditionBlock::codegen() {
 			res += ";\n";
 		}
 
+	}
+
+	if(usesGoto) {
+		slash_t_count -= 1;
+		res += "end;\n";
 	}
 
 	return res;

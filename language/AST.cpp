@@ -471,7 +471,7 @@ llvm::Value* AST::If::codegen() {
 	}
 
 	bool skipPHICreation = else_body.size() == 0 && IfContainsLLReturn;
-	bool containsGoto = false;
+	bool containsGotoOrReturn = IfContainsLLReturn;
 
 	if(!skipPHICreation) { CreatePHIs(); }
 
@@ -496,7 +496,7 @@ llvm::Value* AST::If::codegen() {
 		i->codegen();
 
 		if(dynamic_cast<AST::Goto*>(i.get())) {
-			containsGoto = true;
+			containsGotoOrReturn = true;
 		}
 	}
 
@@ -504,11 +504,11 @@ llvm::Value* AST::If::codegen() {
 
 	AST::GlobalSaveState(IfBlock);
 
-	if(!containsGoto) {
+	if(!containsGotoOrReturn) {
 		CodeGen::Builder->CreateBr(ContinueBlock);
 	}
 
-	containsGoto = false;
+	containsGotoOrReturn = false;
 
 	valuesAlreadySet.clear();
 
@@ -531,7 +531,11 @@ llvm::Value* AST::If::codegen() {
 			i->codegen();
 
 			if(dynamic_cast<AST::Goto*>(i.get())) {
-				containsGoto = true;
+				containsGotoOrReturn = true;
+			}
+
+			if(dynamic_cast<AST::LLReturn*>(i.get())) {
+				containsGotoOrReturn = true;
 			}
 		}
 
@@ -539,7 +543,7 @@ llvm::Value* AST::If::codegen() {
 
 		AST::GlobalSaveState(ElseBlock);
 	
-		if(!containsGoto) {
+		if(!containsGotoOrReturn) {
 			CodeGen::Builder->CreateBr(ContinueBlock);
 		}
 	}
