@@ -79,8 +79,6 @@ llvm::Value* AST::IntNumber::codegen() {
 
 llvm::Value* AST::Variable::codegen() {
 
-	std::cout << "Executing " << name << " initializers...\n";
-
 	if(!areInitializersGenerated) {
 
 		for(auto const& i : initializers) {
@@ -264,7 +262,7 @@ bool AST::IsInitializer(AST::Expression* t) {
 
 bool AST::IsAlgorithm(AST::Expression* t) {
 
-	return dynamic_cast<AST::If*>(t) != nullptr || dynamic_cast<AST::While*>(t) != nullptr;
+	return dynamic_cast<AST::If*>(t) != nullptr || dynamic_cast<AST::While*>(t) != nullptr || dynamic_cast<AST::Block*>(t) != nullptr;
 }
 
 llvm::Value* AST::GetOrigin(std::string name) {
@@ -360,21 +358,74 @@ llvm::Value* AST::While::codegen() {
 
 	CodeGen::EndScope(LoopBlock);
 
-	AST::GlobalSaveState(LoopBlock);
-
 	auto currentBlock = CodeGen::Builder->GetInsertBlock();
 
-	if(LoopBlock != currentBlock) {
-		CodeGen::EndScope(currentBlock);
+	CodeGen::EndScope(currentBlock);
+	AST::GlobalSaveState(currentBlock);
 
-		AST::GlobalSaveState(currentBlock);
-	}
-
-	TheFunction->getBasicBlockList().push_back(ContinueBlock);
+	TheFunction->insert(TheFunction->end(), ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
 	CreatePHIs();
 
+	return nullptr;
+}
+
+llvm::Value* AST::Block::codegen() {
+
+	llvm::Function *TheFunction = CodeGen::Builder->GetInsertBlock()->getParent();
+
+	llvm::BasicBlock* EntryBlock = CodeGen::Builder->GetInsertBlock();
+
+	AST::GlobalSaveState(EntryBlock);
+
+	llvm::BasicBlock* TheBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, name, TheFunction);
+	llvm::BasicBlock* ContinueBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "continue");
+
+	CodeGen::Builder->CreateBr(TheBlock);
+	CodeGen::Builder->SetInsertPoint(TheBlock);
+
+	CodeGen::pureBlocks.push_back(TheBlock);
+
+	CreatePHIs();
+
+	for(auto const& i: body) {
+
+		if(AST::IsAlgorithm(i.get())) {
+			AST::GlobalSaveState(TheBlock);
+		}
+
+		auto t = i->codegen();
+	}
+
+	CodeGen::Builder->CreateBr(ContinueBlock);
+
+	CodeGen::EndScope(TheBlock);
+
+	auto currentBlock = CodeGen::Builder->GetInsertBlock();
+
+	CodeGen::EndScope(currentBlock);
+	AST::GlobalSaveState(currentBlock);
+
+	TheFunction->insert(TheFunction->end(), ContinueBlock);
+	CodeGen::Builder->SetInsertPoint(ContinueBlock);
+
+	CreatePHIs();
+
+	return nullptr;
+}
+
+llvm::Value* AST::Goto::codegen() {
+	for(auto i : CodeGen::pureBlocks) {
+		std::string bName = std::string(i->getName());
+
+		if(bName == name) {
+			return CodeGen::Builder->CreateBr(i);
+		}
+	}
+
+	std::cout << "Error: Block '" << name << "' not found inside codegen.\n";
+	exit(1);
 	return nullptr;
 }
 
@@ -420,6 +471,7 @@ llvm::Value* AST::If::codegen() {
 	}
 
 	bool skipPHICreation = else_body.size() == 0 && IfContainsLLReturn;
+	bool containsGoto = false;
 
 	if(!skipPHICreation) { CreatePHIs(); }
 
@@ -442,19 +494,27 @@ llvm::Value* AST::If::codegen() {
 		}
 
 		i->codegen();
+
+		if(dynamic_cast<AST::Goto*>(i.get())) {
+			containsGoto = true;
+		}
 	}
 
 	CodeGen::EndScope(IfBlock);
 
 	AST::GlobalSaveState(IfBlock);
 
-	CodeGen::Builder->CreateBr(ContinueBlock);
+	if(!containsGoto) {
+		CodeGen::Builder->CreateBr(ContinueBlock);
+	}
+
+	containsGoto = false;
 
 	valuesAlreadySet.clear();
 
 	if(else_body.size() != 0) {
 
-		TheFunction->getBasicBlockList().push_back(ElseBlock);
+		TheFunction->insert(TheFunction->end(), ElseBlock);
 		CodeGen::Builder->SetInsertPoint(ElseBlock);
 
 		CreatePHIs();
@@ -469,16 +529,22 @@ llvm::Value* AST::If::codegen() {
 			i->parent_entry_block = finalEntryBlock;
 
 			i->codegen();
+
+			if(dynamic_cast<AST::Goto*>(i.get())) {
+				containsGoto = true;
+			}
 		}
 
 		CodeGen::EndScope(ElseBlock);
 
 		AST::GlobalSaveState(ElseBlock);
 	
-		CodeGen::Builder->CreateBr(ContinueBlock);
+		if(!containsGoto) {
+			CodeGen::Builder->CreateBr(ContinueBlock);
+		}
 	}
 
-	TheFunction->getBasicBlockList().push_back(ContinueBlock);
+	TheFunction->insert(TheFunction->end(), ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
 	if(!skipPHICreation) { CreatePHIs(); }

@@ -35,6 +35,8 @@ struct Parser {
 	static std::unique_ptr<AST::Expression> lastCompareTwo;
 	static int lastCmpType;
 
+	static std::vector<std::string> allBlockNames;
+
 	static void AddParserCom(std::string name, AST::Type* t) {
 
 		all_parser_coms[name] = t;
@@ -563,8 +565,6 @@ struct Parser {
 
 		value = MemTreatment(std::move(value));
 
-		std::cout << "ComStore >> Target Name: '" << target->name << "'. Value Name: '" << value->name << "'.\n";
-
 		return std::make_unique<AST::ComStore>(std::move(target), std::move(value));
 	}
 
@@ -673,6 +673,74 @@ struct Parser {
 		return std::make_unique<AST::While>(std::move(Cond), std::move(RepeatCond), std::move(loop_body));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseBlock() {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != Token::Identifier) {
+			ExprError("Expected identifier for new block.");
+		}
+
+		std::string name = Lexer::IdentifierStr;
+
+		Parser::allBlockNames.push_back(name);
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != Token::Begin) {
+			ExprError("Expected 'begin' for new block.");
+		}
+
+		Lexer::GetNextToken();
+
+		std::vector<std::unique_ptr<AST::Expression>> all_instructions;
+
+		while (Lexer::CurrentToken != Token::End) { 
+
+			std::unique_ptr<AST::Expression> e = ParseExpression();
+
+			if(Lexer::CurrentToken != ';') { ExprError("Expected ';' to end instruction inside '" + name + "' block."); }
+
+			all_instructions.push_back(std::move(e));
+
+			ResetMainTarget();
+
+			Lexer::GetNextToken();
+		}
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::Block>(name, std::move(all_instructions));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseGoto() {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != Token::Identifier) {
+			ExprError("Expected block name.");
+		}
+
+		std::string blockName = Lexer::IdentifierStr;
+
+		bool blockNameExists = false;
+		for(auto i : Parser::allBlockNames) {
+
+			if(i == blockName) {
+				blockNameExists = true;
+				break;
+			}
+		}
+
+		if(!blockNameExists) {
+			ExprError("Block '" + blockName + "' does not exist.");
+		}
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::Goto>(blockName);
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -699,6 +767,9 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::IntCast) { return ParseIntCast(); }
 
 		else if(Lexer::CurrentToken == Token::While) { return ParseWhile(); }
+
+		else if(Lexer::CurrentToken == Token::Block) { return ParseBlock(); }
+		else if(Lexer::CurrentToken == Token::Goto) { return ParseGoto(); }
 
 		ExprError("Unknown expression found.");
 		return nullptr;

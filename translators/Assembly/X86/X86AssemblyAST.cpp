@@ -270,25 +270,28 @@ std::string X86AssemblyAST::P2Align::codegen() {
 	return res;
 }
 
-std::string JumpInstructionToCompare(std::string comp, bool& is_second_param_zero) {
+std::string JumpInstructionToCompare(std::string comp) {
 
-	if(comp == "jge") { is_second_param_zero = false; return "IsMoreThanOrEquals"; }
-	if(comp == "jle") { is_second_param_zero = false; return "IsLessThanOrEquals"; }
+	if(comp == "jge") { return "IsMoreThanOrEquals"; }
+	if(comp == "jle") { return "IsLessThanOrEquals"; }
 
-	if(comp == "jg") { is_second_param_zero = false; return "IsMoreThan"; }
-	if(comp == "jl") { is_second_param_zero = false; return "IsLessThan"; }
+	if(comp == "jg") { return "IsMoreThan"; }
+	if(comp == "jl") { return "IsLessThan"; }
 
-	if(comp == "je") { is_second_param_zero = false; return "IsEquals"; }
-	if(comp == "jne") { is_second_param_zero = false; return "IsNotEquals"; }
+	if(comp == "je") { return "IsEquals"; }
+	if(comp == "jne") { return "IsNotEquals"; }
 
-	if(comp == "jz") { is_second_param_zero = true; return "IsEquals"; }
-	if(comp == "jnz") { is_second_param_zero = true; return "IsNotEquals"; }
+	if(comp == "jz") { return "IsEquals"; }
+	if(comp == "jnz") { return "IsNotEquals"; }
 
-	if(comp == "js") { is_second_param_zero = true; return "IsMoreThan"; }
-	if(comp == "jns") { is_second_param_zero = true; return "IsLessThan"; }
+	if(comp == "js") { return "IsMoreThan"; }
+	if(comp == "jns") { return "IsLessThan"; }
 
-	if(comp == "ja") { is_second_param_zero = true; return "IsMoreThan"; }
-	if(comp == "jb") { is_second_param_zero = true; return "IsLessThan"; }
+	if(comp == "ja") { return "IsMoreThan"; }
+	if(comp == "jb") { return "IsLessThan"; }
+
+	if(comp == "jae") { return "IsMoreThanOrEquals"; }
+	if(comp == "jbe") { return "IsLessThanOrEquals"; }
 
 	return "";
 }
@@ -299,26 +302,22 @@ std::string X86AssemblyAST::If::codegen() {
 
 	res += "if COMPARE.";
 
-	bool is_second_param_zero = false;
-
-	res += JumpInstructionToCompare(cmpType, is_second_param_zero);
+	res += JumpInstructionToCompare(cmpType);
 	res += "(";
 
 	res += B->codegen();
 	res += ", ";
-
-	if(!is_second_param_zero) {
-		res += A->codegen();
-	}
-	else {
-		res += "0";
-	}
+	res += A->codegen();
 
 	res += ") then\n";
 
 	slash_t_count += 1;
 
+	std::cout << "Generating If (" << conditionBlockName << ")...\n";
+
 	res += X86AssemblyAST::GetConditionBlock(conditionBlockName)->codegen();
+
+	std::cout << "'" << conditionBlockName << "' Generated!\n";
 
 	slash_t_count -= 1;
 
@@ -342,11 +341,7 @@ std::string X86AssemblyAST::If::codegen() {
 
 std::string X86AssemblyAST::Jump::codegen() {
 
-	//if(generateJumpBlock) {
-	//	return X86AssemblyAST::GetConditionBlock(name)->codegen();
-	//}
-
-	return "";
+	return X86AssemblyAST::GetConditionBlock(name)->codegen();
 }
 
 std::string X86AssemblyAST::While::codegen() {
@@ -355,9 +350,7 @@ std::string X86AssemblyAST::While::codegen() {
 
 	res += "while COMPARE.";
 
-	bool is_second_param_zero = false;
-
-	res += JumpInstructionToCompare(cmp->cmpType, is_second_param_zero);
+	res += JumpInstructionToCompare(cmp->cmpType);
 	res += "(";
 
 	res += cmp->B->codegen();

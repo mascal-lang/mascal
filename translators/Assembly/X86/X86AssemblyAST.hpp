@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <iostream>
 
 #define NEW_X86_TYPE(x) struct x : public Type { std::string codegen() override; std::unique_ptr<Type> Clone() override { return std::make_unique<x>(); } }
 
@@ -519,6 +520,9 @@ struct X86AssemblyAST {
 				return i.get();
 			}
 		}
+
+		std::cout << "'" << name << "' Condition Block Not Found!\n";
+		exit(1);
 
 		return nullptr;
 	};

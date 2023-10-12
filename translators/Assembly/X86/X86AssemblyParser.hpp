@@ -148,6 +148,53 @@ struct X86AssemblyParser {
 		return std::move(cfcast->instructions);
 	}
 
+	static std::unique_ptr<X86AssemblyAST::If> ParsePossibleElse(std::unique_ptr<X86AssemblyAST::If> lastIf, std::string parentBlock = "") {
+
+		std::string elseJumpName = "";
+
+		if(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86EndOfFile && 
+			X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
+			X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp &&
+			!X86AssemblyLexer::IsIdentifierMetadata()) {
+
+			auto elseBlock = ParseExpression();
+
+			if(dynamic_cast<X86AssemblyAST::DoNothing*>(elseBlock.get()) != nullptr) {
+
+				elseJumpName = elseBlock->name;
+				conditionJumpList.push_back(elseJumpName);
+
+				lastIf->elseConditionBlockName = elseJumpName;
+			}
+			else {
+
+				std::vector<std::unique_ptr<X86AssemblyAST::Expression>> v;
+
+				std::string vName = std::string("custom") + std::to_string(X86AssemblyAST::allConditionBlocks.size());
+
+				v.push_back(std::move(elseBlock));
+
+				while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
+				X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp) {
+
+					auto E = ParseExpression();
+
+					v.push_back(std::move(E));
+				}
+
+				auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(vName, std::move(v));
+
+				X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
+
+				//conditionJumpList.push_back(vName);
+
+				lastIf->elseConditionBlockName = vName;
+			}
+		}
+
+		return lastIf;
+	}
+
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseFunction(std::string name, bool dont_move = false, std::string parentBlock = "") {
 
 		if(!dont_move) {
@@ -212,50 +259,8 @@ struct X86AssemblyParser {
 						break;
 					}
 					else {
-						std::string elseJumpName = "";
-
-						if(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
-							X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp &&
-							!X86AssemblyLexer::IsIdentifierMetadata()) {
-
-							auto elseBlock = ParseExpression();
-
-							if(dynamic_cast<X86AssemblyAST::DoNothing*>(elseBlock.get()) != nullptr) {
-
-								elseJumpName = elseBlock->name;
-								conditionJumpList.push_back(elseJumpName);
-
-								lastIf->elseConditionBlockName = elseJumpName;
-
-								Expr = lastIf->Clone();
-							}
-							else {
-
-								std::vector<std::unique_ptr<X86AssemblyAST::Expression>> v;
-
-								std::string vName = std::string("custom") + std::to_string(X86AssemblyAST::allConditionBlocks.size());
-
-								v.push_back(std::move(elseBlock));
-
-								while(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
-								X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp) {
-
-									auto E = ParseExpression();
-
-									v.push_back(std::move(E));
-								}
-
-								auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(vName, std::move(v));
-
-								X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
-
-								conditionJumpList.push_back(vName);
-
-								lastIf->elseConditionBlockName = vName;
-
-								Expr = lastIf->Clone();
-							}
-						}
+						lastIf = ParsePossibleElse(std::move(lastIf));
+						Expr = lastIf->Clone();
 					}
 				}
 
@@ -291,19 +296,25 @@ struct X86AssemblyParser {
 				lastIf->cmpType = GetOppositeComparator(lastIf->cmpType);
 			}
 
+			std::cout << "Generated '" << name << "' as while loop.\n";
+
 			return std::make_unique<X86AssemblyAST::While>(std::move(lastIf), std::move(allInstructions), freezeLastIfSearch);
 		}
 
-		if(isInJmpList) {
+		//if(isInJmpList) {
 
 			auto CBlock = std::make_unique<X86AssemblyAST::ConditionBlock>(name, std::move(allInstructions));
 
 			X86AssemblyAST::allConditionBlocks.push_back(std::move(CBlock));
 
-			return std::make_unique<X86AssemblyAST::DoNothing>(name);
-		}
+			std::cout << "Generated '" << name << "' as condition block.\n";
 
-		return std::make_unique<X86AssemblyAST::Function>(name, attrs, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
+			return std::make_unique<X86AssemblyAST::DoNothing>(name);
+		//}
+
+		//std::cout << "Generated '" << name << "' as function.\n";
+
+		//return std::make_unique<X86AssemblyAST::Function>(name, attrs, std::move(allInstructions), std::move(astRegisters), std::move(stackMemory));
 	}
 
 	static std::unique_ptr<X86AssemblyAST::Expression> ParseIdentifier() {
@@ -673,6 +684,8 @@ struct X86AssemblyParser {
 
 			std::string jmp = X86AssemblyLexer::IdentifierStr;
 
+			std::cout << "'" << jmp << "' found!\n";
+
 			X86AssemblyLexer::GetNextToken();
 
 			std::string jumpName = X86AssemblyLexer::IdentifierStr;
@@ -724,14 +737,6 @@ struct X86AssemblyParser {
 			X86AssemblyLexer::GetNextToken();
 
 			std::string elseJumpName = "";
-			//if(X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Identifier && 
-			//	X86AssemblyLexer::CurrentToken != X86AssemblyToken::X86Jmp &&
-			//	!X86AssemblyLexer::IsIdentifierMetadata()) {
-
-			//	auto elseBlock = ParseFunction(std::string("else") + std::to_string(conditionJumpList.size()), true);
-			//	elseJumpName = elseBlock->name;
-			//	conditionJumpList.push_back(elseJumpName);
-			//}
 
 			return std::make_unique<X86AssemblyAST::If>(std::make_unique<X86AssemblyAST::IntNumber>(0), std::move(B), jmp, jumpName, elseJumpName);
 		}
@@ -784,7 +789,7 @@ struct X86AssemblyParser {
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SEHEnd) { return ParseSEHEnd(); }
 		else if(X86AssemblyLexer::CurrentToken == X86AssemblyToken::X86SEHSetFrame) { return ParseSEHSetFrame(); }
 
-		std::cout << "Unknown token or identifier found.\n";
+		std::cout << "Unknown token or identifier found. Found Token Number '" << X86AssemblyLexer::CurrentToken << "'\n";
 		exit(1);
 
 		return nullptr;
@@ -792,9 +797,9 @@ struct X86AssemblyParser {
 
 	static std::string HandleExpression() {
 
-		auto Expr = ParseExpression();
-
 		std::string res = "";
+
+		auto Expr = ParseExpression();
 
 		if(Expr != nullptr) {
 

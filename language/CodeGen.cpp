@@ -13,6 +13,8 @@ bool CodeGen::releaseMode = false;
 
 std::vector<std::pair<std::string, llvm::PHINode*>> CodeGen::all_phi_nodes;
 
+std::vector<llvm::BasicBlock*> CodeGen::pureBlocks;
+
 void CodeGen::Initialize()
 {
 	// Open a new context and module.
@@ -28,6 +30,21 @@ void CodeGen::Initialize()
 void CodeGen::AddPHINodeToVec(std::string name, llvm::PHINode* p) {
 
 	CodeGen::all_phi_nodes.push_back(std::make_pair(name, p));
+}
+
+llvm::Value* Default(llvm::Value* v) {
+
+	if(dyn_cast<llvm::IntegerType>(v->getType()) != nullptr) {
+
+		auto intType = dyn_cast<llvm::IntegerType>(v->getType());
+
+		return llvm::ConstantInt::get(*CodeGen::TheContext, llvm::APInt(intType->getBitWidth(), 0, true));
+	}
+
+	std::cout << "Error: Type not found.\n";
+	exit(1);
+
+	return nullptr;
 }
 
 void CodeGen::UpdateAllPHIPreds() {
@@ -48,7 +65,14 @@ void CodeGen::UpdateAllPHIPreds() {
 			auto V = AST::FindExistingState(i.first, b);
 
 			if(!AST::IsInstructionInsideOfBlock(b, V)) {
-				V = AST::GetOrigin(i.first);
+				auto newV = AST::GetOrigin(i.first);
+
+				if(!AST::IsInstructionInsideOfBlock(b, newV)) {
+					V = Default(newV);
+				}
+				else {
+					V = newV;
+				}
 			}
 
 			if(V == nullptr) {

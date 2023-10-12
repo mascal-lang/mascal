@@ -47,6 +47,9 @@ enum Token
 
 	While = -25,
 	Do = -26,
+
+	Block = -27,
+	Goto = -28,
 };
 
 enum LexerIsInside {
@@ -260,6 +263,9 @@ struct Lexer
 
 		else if(IsIdentifier("while")) return Token::While;
 		else if(IsIdentifier("do")) return Token::Do;
+
+		else if(IsIdentifier("block")) return Token::Block;
+		else if(IsIdentifier("goto")) return Token::Goto;
 
 		return Token::Identifier;
 	}

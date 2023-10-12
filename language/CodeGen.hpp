@@ -42,7 +42,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/CFG.h"
 #include <unordered_map>
 
@@ -82,6 +81,8 @@ struct CodeGen {
 	static std::unordered_map<std::string, std::unique_ptr<LLVM_Mem>> all_mems;
 
 	static std::vector<std::pair<std::string, llvm::PHINode*>> all_phi_nodes;
+
+	static std::vector<llvm::BasicBlock*> pureBlocks;
 
 	static void AddPHINodeToVec(std::string name, llvm::PHINode* p);
 	static void UpdateAllPHIPreds();

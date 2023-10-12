@@ -905,6 +905,126 @@ struct AST {
 		}
 	};
 
+	struct Block : public Expression {
+
+		EXPR_OBJ_VECTOR() body;
+
+		Block(std::string name_in, EXPR_OBJ_VECTOR() body_in) {
+
+			name = name_in;
+			body = std::move(body_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "block ";
+			
+			res += name;
+			res += " begin\n";
+
+			slash_t_count += 1;
+
+			for(auto const& i: body) {
+				res += GetSlashT();
+				res += i->ToLLMascalBefore();
+				res += "\n";
+
+				res += GetSlashT();
+				res += i->ToLLMascal();
+				res += "\n";
+			}
+
+			slash_t_count -= 1;
+
+			res += GetSlashT() + "end;\n";
+			
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+
+			for(auto const& i : body) {
+
+				i->ReplaceTargetNameTo(from, to);
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			if(name == str) {
+				return true;
+			}
+
+			for(auto const& i : body) {
+				if(i->ContainsName(str)) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			CLONE_EXPR_VECTOR(body, clone_body);
+
+			return std::make_unique<Block>(name, std::move(clone_body));
+		}
+	};
+
+	struct Goto : public Expression {
+
+		Goto(std::string name_in) {
+			name = name_in;
+		}
+
+		llvm::Value* codegen() override;
+
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "goto ";
+			res += name;
+			res += ";";
+
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			if(name == from) {
+				name = to;
+			}
+		}
+
+		bool ContainsName(std::string str) override {
+
+			if(name == str) {
+				return true;
+			}
+
+			return false;
+		}
+
+		EXPR_OBJ() Clone() override {
+			return std::make_unique<Goto>(name);
+		}
+	};
+
 	struct If : public Expression {
 
 		EXPR_OBJ() condition;
