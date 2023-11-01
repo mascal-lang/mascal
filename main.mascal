@@ -1,9 +1,14 @@
 program begin
 
-	mem x: i32 = 0;
-	mem y: i32 = 6;
+	com x: i32 = 0;
+	com y: i32 = 6;
 
-	x += y;
+	block Loop1 begin
+		x += 1;
+		
+		if COMPARE.IsLessThan(x, 100) then goto Loop1;
+		end;
+	end;
 
 	return x;
 

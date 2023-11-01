@@ -24,32 +24,35 @@ enum Token
 
 	Add = -10,
 	Sub = -11,
-	Xor = -12,
 
-	Compare = -13,
+	And = -12,
+	Or = -13,
+	Xor = -14,
 
-	If = -14,
-	Then = -15,
-	Else = -16,
+	Compare = -15,
 
-	Return = -17,
+	If = -16,
+	Then = -17,
+	Else = -18,
 
-	Procedure = -18,
+	Return = -19,
 
-	ComStore = -19,
+	Procedure = -20,
 
-	Mem = -20,
-	LoadMem = -21,
-	MemStore = -22,
+	ComStore = -21,
 
-	IntCast = -23,
-	To = -24,
+	Mem = -22,
+	LoadMem = -23,
+	MemStore = -24,
 
-	While = -25,
-	Do = -26,
+	IntCast = -25,
+	To = -26,
 
-	Block = -27,
-	Goto = -28,
+	While = -27,
+	Do = -28,
+
+	Block = -29,
+	Goto = -30,
 };
 
 enum LexerIsInside {
@@ -240,6 +243,9 @@ struct Lexer
 
 		else if(IsIdentifier("add")) return Token::Add;
 		else if(IsIdentifier("sub")) return Token::Sub;
+
+		else if(IsIdentifier("and")) return Token::And;
+		else if(IsIdentifier("or")) return Token::Or;
 		else if(IsIdentifier("xor")) return Token::Xor;
 
 		else if(IsIdentifier("COMPARE")) return Token::Compare;

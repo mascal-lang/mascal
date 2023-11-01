@@ -1,8 +1,6 @@
 #include "X86AssemblyAST.hpp"
 #include <iostream>
 
-std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> X86AssemblyAST::allConditionBlocks;
-
 int X86AssemblyAST::slash_t_count = 0;
 
 std::string X86AssemblyAST::Variable::codegen() {
@@ -152,11 +150,19 @@ std::string X86AssemblyAST::Xor::codegen() {
 
 	std::string res;
 
-	//if(X86AssemblyAST::IsStackPointer(target->name)) {
-	//	return std::string("# [Assembly]: Reserve '") + value->codegen() + std::string("' bytes for local variables.");
-	//}
-
 	res += "xor ";
+	res += target->codegen();
+	res += ", ";
+	res += value->codegen();
+
+	return res;
+}
+
+std::string X86AssemblyAST::And::codegen() {
+
+	std::string res;
+
+	res += "and ";
 	res += target->codegen();
 	res += ", ";
 	res += value->codegen();
@@ -313,42 +319,36 @@ std::string X86AssemblyAST::If::codegen() {
 
 	slash_t_count += 1;
 
-	std::cout << "Generating If (" << conditionBlockName << ")...\n";
+	res += GetSlashT();
 
-	res += X86AssemblyAST::GetConditionBlock(conditionBlockName)->codegen();
+	std::string blockName = conditionBlockName;
 
-	std::cout << "'" << conditionBlockName << "' Generated!\n";
+	if(blockName[0] == '.') {
+		blockName.erase(blockName.begin());
+	}
+	
+	res += "goto ";
+	res += blockName;
+	res += ";\n";
 
 	slash_t_count -= 1;
 
-	if(elseConditionBlockName.size() != 0) {
-
-		std::cout << "Generating Else...\n";
-
-		res += GetSlashT() + "else then\n";
-
-		slash_t_count += 1;
-
-		res += X86AssemblyAST::GetConditionBlock(elseConditionBlockName)->codegen();
-
-		slash_t_count -= 1;
-	}
-
-	res += GetSlashT() + "end";
+	res += GetSlashT();
+	res += "end";
 
 	return res;
 }
 
 std::string X86AssemblyAST::Jump::codegen() {
 
-	auto GCB = X86AssemblyAST::GetConditionBlock(name);
+	std::string blockName = name;
 
-	if(!GCB->usesGoto) {
-		return GCB->codegen();
+	if(blockName[0] == '.') {
+		blockName.erase(blockName.begin());
 	}
-
+	
 	std::string gotoRes = "goto ";
-	gotoRes += name;
+	gotoRes += blockName;
 	return gotoRes;
 }
 
@@ -377,9 +377,17 @@ std::string X86AssemblyAST::While::codegen() {
 
 		if(i->ifId != cmp->ifId) {
 
-			std::cout << "Instruction Accepted! (i->ifId: " << i->ifId << ", cmp->ifId: " << cmp->ifId << ")\n";
+			std::string insCG;
 
-			std::string insCG = i->codegen();
+			if(dynamic_cast<X86AssemblyAST::If*>(i.get()) != nullptr) {
+				auto ifV = dynamic_cast<X86AssemblyAST::If*>(i.get());
+
+				if(ifV->conditionBlockName == parentName) {
+					continue;
+				}
+			}
+
+			insCG = i->codegen();
 
 			if(insCG != "") {
 				
@@ -396,7 +404,7 @@ std::string X86AssemblyAST::While::codegen() {
 
 		res += GetSlashT() + "end;\n";
 
-		res += X86AssemblyAST::GetConditionBlock(cmp->conditionBlockName)->codegen();
+		//res += X86AssemblyAST::GetConditionBlock(cmp->conditionBlockName)->codegen();
 	
 		if(res[res.size() - 1] == '\n') {
 			res.pop_back();
@@ -414,35 +422,42 @@ std::string X86AssemblyAST::While::codegen() {
 	return res;
 }
 
-std::string X86AssemblyAST::ConditionBlock::codegen() {
+std::string X86AssemblyAST::Block::codegen() {
 
 	std::string res;
+	std::string blockName = name;
 
-	if(usesGoto) {
-		res += "block ";
-		res += name;
-		res += " begin\n";
-
-		slash_t_count += 1;
+	if(blockName[0] == '.') {
+		blockName.erase(blockName.begin());
 	}
 
+	res += "block ";
+	res += blockName;
+	res += " begin\n";
+
+	slash_t_count += 1;
+	
 	for(auto const& i : instructions) {
+		
+		std::string insCG;
 
-		std::string insCG = i->codegen();
-
+		if(i->name != name) {
+			i->parentName = name;
+			insCG = i->codegen();
+		}
+	
 		if(insCG != "") {
 			
 			res += GetSlashT();
 			res += insCG;
 			res += ";\n";
 		}
-
+	
 	}
-
-	if(usesGoto) {
-		slash_t_count -= 1;
-		res += "end;\n";
-	}
+	
+	slash_t_count -= 1;
+	res += GetSlashT();
+	res += "end";
 
 	return res;
 }

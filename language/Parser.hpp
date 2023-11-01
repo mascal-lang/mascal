@@ -396,6 +396,40 @@ struct Parser {
 		return std::make_unique<AST::Sub>(UnverifyMem(std::move(target)), MemTreatment(std::move(value)));
 	}
 
+	static std::unique_ptr<AST::Expression> ParseAnd() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::And>(UnverifyMem(std::move(target)), MemTreatment(std::move(value)));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseOr() {
+
+		Lexer::GetNextToken();
+
+		ResetMainTarget();
+
+		std::unique_ptr<AST::Expression> target = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') { ExprError("Expected ','."); }
+
+		Lexer::GetNextToken();
+
+		std::unique_ptr<AST::Expression> value = ParseExpression();
+
+		return std::make_unique<AST::Or>(UnverifyMem(std::move(target)), MemTreatment(std::move(value)));
+	}
+
 	static std::unique_ptr<AST::Expression> ParseXor() {
 
 		Lexer::GetNextToken();
@@ -732,10 +766,6 @@ struct Parser {
 			}
 		}
 
-		if(!blockNameExists) {
-			ExprError("Block '" + blockName + "' does not exist.");
-		}
-
 		Lexer::GetNextToken();
 
 		return std::make_unique<AST::Goto>(blockName);
@@ -748,13 +778,16 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::Com) 		{ return ParseCom(); }
 		else if(Lexer::CurrentToken == Token::LLReturn) { return ParseLLReturn(); }
 
-		else if(Lexer::CurrentToken == Token::Add) 		{ return ParseAdd(); }
-		else if(Lexer::CurrentToken == Token::Sub) 		{ return ParseSub(); }
-		else if(Lexer::CurrentToken == Token::Xor) 		{ return ParseXor(); }
+		else if(Lexer::CurrentToken == Token::Add) { return ParseAdd(); }
+		else if(Lexer::CurrentToken == Token::Sub) { return ParseSub(); }
 
-		else if(Lexer::CurrentToken == Token::Compare) 	{ return ParseCompare(); }
+		else if(Lexer::CurrentToken == Token::And) { return ParseAnd(); }
+		else if(Lexer::CurrentToken == Token::Or) { return ParseOr(); }
+		else if(Lexer::CurrentToken == Token::Xor) { return ParseXor(); }
 
 		else if(Lexer::CurrentToken == Token::If) { return ParseIf(); }
+
+		else if(Lexer::CurrentToken == Token::Compare) { return ParseCompare(); }
 
 		else if(Lexer::CurrentToken == Token::Return) { return ParseReturn(); }
 
@@ -771,7 +804,7 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::Block) { return ParseBlock(); }
 		else if(Lexer::CurrentToken == Token::Goto) { return ParseGoto(); }
 
-		ExprError("Unknown expression found.");
+		ExprError("Unknown expression found. Found Token Number: " + std::to_string(Lexer::CurrentToken));
 		return nullptr;
 	}
 

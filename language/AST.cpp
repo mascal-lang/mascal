@@ -167,6 +167,34 @@ llvm::Value* AST::Sub::codegen() {
 	return result;
 }
 
+llvm::Value* AST::And::codegen() {
+
+	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
+	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
+
+	std::string finalName = std::string("and") + target->name;
+
+	llvm::Value* result = CodeGen::Builder->CreateAnd(L, R, finalName.c_str());
+
+	AST::AddInstruction(target.get(), result);
+
+	return result;
+}
+
+llvm::Value* AST::Or::codegen() {
+
+	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
+	llvm::Value* R = AST::GetOrCreateInstruction(value.get());
+
+	std::string finalName = std::string("or") + target->name;
+
+	llvm::Value* result = CodeGen::Builder->CreateOr(L, R, finalName.c_str());
+
+	AST::AddInstruction(target.get(), result);
+
+	return result;
+}
+
 llvm::Value* AST::Xor::codegen() {
 
 	llvm::Value* L = AST::GetOrCreateInstruction(target.get());
@@ -371,6 +399,21 @@ llvm::Value* AST::While::codegen() {
 	return nullptr;
 }
 
+llvm::BasicBlock* GetAOTBasicBlock(std::string name) {
+
+	for(auto i : CodeGen::pureBlocks) {
+		std::string bName = std::string(i->getName());
+
+		if(bName == name) {
+			return i;
+		}
+	}
+
+	std::cout << "Error: Block '" << name << "' not found inside codegen.\n";
+	exit(1);
+	return nullptr;
+}
+
 llvm::Value* AST::Block::codegen() {
 
 	llvm::Function *TheFunction = CodeGen::Builder->GetInsertBlock()->getParent();
@@ -379,15 +422,21 @@ llvm::Value* AST::Block::codegen() {
 
 	AST::GlobalSaveState(EntryBlock);
 
-	llvm::BasicBlock* TheBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, name, TheFunction);
+	llvm::BasicBlock* TheBlock = GetAOTBasicBlock(name);
 	llvm::BasicBlock* ContinueBlock = llvm::BasicBlock::Create(*CodeGen::TheContext, "continue");
 
-	CodeGen::Builder->CreateBr(TheBlock);
+	if(!isa<llvm::BranchInst>(EntryBlock->back())) {
+		CodeGen::Builder->CreateBr(TheBlock);
+	}
+
+	TheFunction->insert(TheFunction->end(), TheBlock);
 	CodeGen::Builder->SetInsertPoint(TheBlock);
 
 	CodeGen::pureBlocks.push_back(TheBlock);
 
 	CreatePHIs();
+
+	bool containsGotoOrReturn = false;
 
 	for(auto const& i: body) {
 
@@ -395,10 +444,20 @@ llvm::Value* AST::Block::codegen() {
 			AST::GlobalSaveState(TheBlock);
 		}
 
+		if(dynamic_cast<AST::Goto*>(i.get())) {
+			containsGotoOrReturn = true;
+		}
+
+		if(dynamic_cast<AST::LLReturn*>(i.get())) {
+			containsGotoOrReturn = true;
+		}
+
 		auto t = i->codegen();
 	}
 
-	CodeGen::Builder->CreateBr(ContinueBlock);
+	if(!containsGotoOrReturn) {
+		CodeGen::Builder->CreateBr(ContinueBlock);
+	}
 
 	CodeGen::EndScope(TheBlock);
 
@@ -416,17 +475,7 @@ llvm::Value* AST::Block::codegen() {
 }
 
 llvm::Value* AST::Goto::codegen() {
-	for(auto i : CodeGen::pureBlocks) {
-		std::string bName = std::string(i->getName());
-
-		if(bName == name) {
-			return CodeGen::Builder->CreateBr(i);
-		}
-	}
-
-	std::cout << "Error: Block '" << name << "' not found inside codegen.\n";
-	exit(1);
-	return nullptr;
+	return CodeGen::Builder->CreateBr(GetAOTBasicBlock(name));
 }
 
 bool IsValueAlreadySet(std::vector<std::string>& strVec, std::string name) {
@@ -473,7 +522,7 @@ llvm::Value* AST::If::codegen() {
 	bool skipPHICreation = else_body.size() == 0 && IfContainsLLReturn;
 	bool containsGotoOrReturn = IfContainsLLReturn;
 
-	if(!skipPHICreation) { CreatePHIs(); }
+	/*if(!skipPHICreation) { */CreatePHIs(); //}
 
 	llvm::BasicBlock* finalEntryBlock = nullptr;
 
@@ -551,7 +600,7 @@ llvm::Value* AST::If::codegen() {
 	TheFunction->insert(TheFunction->end(), ContinueBlock);
 	CodeGen::Builder->SetInsertPoint(ContinueBlock);
 
-	if(!skipPHICreation) { CreatePHIs(); }
+	/*if(!skipPHICreation) { */CreatePHIs(); //}
 
 	return nullptr;
 }

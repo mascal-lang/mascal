@@ -38,6 +38,8 @@ struct X86AssemblyAST {
 
 		int ifId = -1;
 
+		std::string parentName;
+
 		virtual ~Expression() = default;
 
 		virtual std::string codegen() = 0;
@@ -260,6 +262,25 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> Clone() override {
 
 			return std::make_unique<Xor>(value->Clone(), target->Clone());
+		}
+
+		std::string codegen() override;
+	};
+
+	struct And : public Expression {
+
+		std::unique_ptr<Expression> value;
+		std::unique_ptr<Expression> target;
+
+		And(std::unique_ptr<Expression> value_in, std::unique_ptr<Expression> target_in) {
+
+			value = std::move(value_in);
+			target = std::move(target_in);
+		}
+
+		std::unique_ptr<Expression> Clone() override {
+
+			return std::make_unique<And>(value->Clone(), target->Clone());
 		}
 
 		std::string codegen() override;
@@ -491,13 +512,11 @@ struct X86AssemblyAST {
 		}
 	};
 
-	struct ConditionBlock : public Expression {
+	struct Block : public Expression {
 
 		std::vector<std::unique_ptr<Expression>> instructions;
 
-		bool usesGoto = false;
-
-		ConditionBlock(std::string name_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
+		Block(std::string name_in, std::vector<std::unique_ptr<Expression>> instructions_in) {
 
 			name = name_in;
 			instructions = std::move(instructions_in);
@@ -509,47 +528,9 @@ struct X86AssemblyAST {
 
 			CLONE_X86EXPR_VECTOR(instructions, clone_instructions)
 
-			return std::make_unique<ConditionBlock>(name, std::move(clone_instructions));
+			return std::make_unique<Block>(name, std::move(clone_instructions));
 		}
 	};
-
-	static std::vector<std::unique_ptr<X86AssemblyAST::ConditionBlock>> allConditionBlocks;
-
-	static X86AssemblyAST::ConditionBlock* GetConditionBlock(std::string name) {
-
-		for(auto const& i : allConditionBlocks) {
-			if(i->name == name) {
-				return i.get();
-			}
-		}
-
-		std::cout << "'" << name << "' Condition Block Not Found!\n";
-		exit(1);
-
-		return nullptr;
-	};
-
-	/*
-	struct TestVar : public Expression {
-
-		std::unique_ptr<Expression> secondTarget;
-
-		TestVar(std::string name_in, std::unique_ptr<Expression> target_in, std::unique_ptr<Expression> secondTarget_in) {
-
-			name = name_in;
-			target = std::move(target_in);
-			secondTarget = std::move(secondTarget_in);
-
-		}
-
-		std::string codegen() override;
-
-		std::unique_ptr<Expression> Clone() override {
-
-			return std::make_unique<TestVar>(name, target->Clone(), secondTarget->Clone());
-		}
-	}
-	*/
 
 	struct If : public Expression {
 
@@ -557,27 +538,25 @@ struct X86AssemblyAST {
 		std::unique_ptr<Expression> B;
 		std::string cmpType;
 		std::string conditionBlockName;
-		std::string elseConditionBlockName;
 
-		If(std::unique_ptr<Expression> A_in, std::unique_ptr<Expression> B_in, std::string cmpType_in, std::string conditionBlockName_in, std::string elseConditionBlockName_in) {
+		If(std::unique_ptr<Expression> A_in, std::unique_ptr<Expression> B_in, std::string cmpType_in, std::string conditionBlockName_in) {
 
 			A = std::move(A_in);
 			B = std::move(B_in);
 			cmpType = cmpType_in;
 			conditionBlockName = conditionBlockName_in;
-			elseConditionBlockName = elseConditionBlockName_in;
 		}
 
 		std::string codegen() override;
 
 		std::unique_ptr<Expression> Clone() override {
 
-			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName, elseConditionBlockName);
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
 		}
 
 		std::unique_ptr<If> CloneToIf() {
 
-			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName, elseConditionBlockName);
+			return std::make_unique<If>(A->Clone(), B->Clone(), cmpType, conditionBlockName);
 		}
 	};
 
@@ -607,9 +586,11 @@ struct X86AssemblyAST {
 	struct Jump : public Expression {
 
 		std::string jumpBlockName;
+		bool isGoto = false;
 
-		Jump(std::string to) {
+		Jump(std::string to, bool isG = false) {
 			name = to;
+			isGoto = isG;
 		}
 
 		std::string codegen() override;
@@ -619,15 +600,6 @@ struct X86AssemblyAST {
 			return std::make_unique<Jump>(name);
 		}
 	};
-
-	static bool IsJumpRecursive(Expression* expr, std::string functionName) {
-
-		if(dynamic_cast<Jump*>(expr) != nullptr) {
-			return expr->name == functionName;
-		}
-
-		return false;
-	}
 
 	static bool UsesCStdLib(Expression* expr) {
 		return dynamic_cast<EnableStdLib*>(expr) != nullptr;
