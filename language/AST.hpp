@@ -40,6 +40,8 @@ struct AST {
 		virtual std::string ToLLMascal() = 0;
 
 		virtual std::unique_ptr<Type> Clone() = 0;
+
+		std::unique_ptr<AST::Type> childTy;
 	};
 
 	NEW_TYPE(Integer128, return "i128"; );
@@ -50,6 +52,42 @@ struct AST {
 	NEW_TYPE(Integer1, return "i1"; );
 
 	NEW_TYPE(Void, return "void"; );
+
+	struct Array : public Type { 
+
+		llvm::Type* codegen() override; 
+		uint64_t elements = 0;
+
+		Array(std::unique_ptr<AST::Type> t_in, uint64_t elements_in) {
+			childTy = std::move(t_in);
+			elements = elements_in;
+		}
+
+		std::string ToLLMascal() override { 
+			return std::string("Array<") + childTy->ToLLMascal() + std::string(", ") + std::to_string(elements) + std::string(">");
+		}
+
+		std::unique_ptr<Type> Clone() override { 
+			return std::make_unique<Array>(childTy->Clone(), elements); 
+		} 
+	};
+
+	struct Ref : public Type { 
+
+		llvm::Type* codegen() override; 
+
+		Ref(std::unique_ptr<AST::Type> t_in) {
+			childTy = std::move(t_in);
+		}
+
+		std::string ToLLMascal() override { 
+			return std::string("Ref<") + childTy->ToLLMascal() + std::string(">");
+		}
+
+		std::unique_ptr<Type> Clone() override { 
+			return std::make_unique<Ref>(childTy->Clone()); 
+		} 
+	};
 
 	static int slash_t_count;
 
@@ -177,7 +215,7 @@ struct AST {
 
 			name = name_in;
 			ty = std::move(ty_in);
-			target = std::move(target_in);
+			if(target_in != nullptr) { target = std::move(target_in); }
 		}
 
 		llvm::Value* codegen() override;
@@ -186,19 +224,25 @@ struct AST {
 
 			std::string res;
 
-			if(target->ToLLMascalBefore() != "") {
+			if(target != nullptr) {
+				if(target->ToLLMascalBefore() != "") {
 
-				res += target->ToLLMascalBefore();
-				res += "\n";
-				res += GetSlashT();
+					res += target->ToLLMascalBefore();
+					res += "\n";
+					res += GetSlashT();
+				}
 			}
 
 			res += "com ";
 			res += name;
 			res += ": ";
 			res += ty->ToLLMascal();
-			res += " = ";
-			res += target->ToLLMascal();
+
+			if(target != nullptr) {
+				res += " = ";
+				res += target->ToLLMascal();
+			}
+
 			res += ";";
 
 			return res;
@@ -212,17 +256,25 @@ struct AST {
 				name = to;
 			}
 
-			target->ReplaceTargetNameTo(from, to);
+			if(target != nullptr) { target->ReplaceTargetNameTo(from, to); }
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->ContainsName(str);
+			if(target != nullptr) {
+				return name == str || target->ContainsName(str);
+			}
+
+			return name == str;
 		}
 
 		EXPR_OBJ() Clone() override {
 
-			return std::make_unique<Com>(name, ty->Clone(), target->Clone());
+			if(target != nullptr) {
+				return std::make_unique<Com>(name, ty->Clone(), target->Clone());
+			}
+
+			return std::make_unique<Com>(name, ty->Clone(), nullptr);
 		}
 	};
 
@@ -232,7 +284,7 @@ struct AST {
 
 			name = name_in;
 			ty = std::move(ty_in);
-			target = std::move(target_in);
+			if(target_in != nullptr) { target = std::move(target_in); }
 		}
 
 		llvm::Value* codegen() override;
@@ -241,19 +293,25 @@ struct AST {
 
 			std::string res;
 
-			if(target->ToLLMascalBefore() != "") {
+			if(target != nullptr) {
+				if(target->ToLLMascalBefore() != "") {
 
-				res += target->ToLLMascalBefore();
-				res += "\n";
-				res += GetSlashT();
+					res += target->ToLLMascalBefore();
+					res += "\n";
+					res += GetSlashT();
+				}
 			}
 
 			res += "mem ";
 			res += name;
 			res += ": ";
 			res += ty->ToLLMascal();
-			res += " = ";
-			res += target->ToLLMascal();
+
+			if(target != nullptr) {
+				res += " = ";
+				res += target->ToLLMascal();
+			}
+
 			res += ";";
 
 			return res;
@@ -267,17 +325,25 @@ struct AST {
 				name = to;
 			}
 
-			target->ReplaceTargetNameTo(from, to);
+			if(target != nullptr) { target->ReplaceTargetNameTo(from, to); }
 		}
 
 		bool ContainsName(std::string str) override {
 
-			return name == str || target->ContainsName(str);
+			if(target != nullptr) {
+				return name == str || target->ContainsName(str);
+			}
+
+			return name == str;
 		}
 
 		EXPR_OBJ() Clone() override {
 
-			return std::make_unique<Mem>(name, ty->Clone(), target->Clone());
+			if(target != nullptr) {
+				return std::make_unique<Mem>(name, ty->Clone(), target->Clone());
+			}
+
+			return std::make_unique<Mem>(name, ty->Clone(), nullptr);
 		}
 	};
 
@@ -1016,6 +1082,125 @@ struct AST {
 			CLONE_EXPR_VECTOR(loop_body, clone_loop_body);
 
 			return std::make_unique<While>(condition->Clone(), repeat_condition->Clone(), std::move(clone_loop_body));
+		}
+	};
+
+	struct GEL : public Expression {
+
+
+		EXPR_OBJ() array;
+		EXPR_OBJ() item;
+
+		GEL(EXPR_OBJ() array_in, EXPR_OBJ() item_in, std::unique_ptr<AST::Type> ty_in) {
+
+			array = std::move(array_in);
+			item = std::move(item_in);
+			ty = std::move(ty_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "GEL(";
+			res += array->ToLLMascal();
+			res += ", ";
+			res += item->ToLLMascal();
+			res += ") as ";
+			res += ty->ToLLMascal();
+			
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			array->ReplaceTargetNameTo(from, to);
+			item->ReplaceTargetNameTo(from, to);
+		}
+
+		bool ContainsName(std::string str) override {
+
+			if(array->ContainsName(str)) {
+				return true;
+			}
+
+			if(item->ContainsName(str)) {
+				return true;
+			}
+
+			return false;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<GEL>(array->Clone(), item->Clone(), ty->Clone());
+		}
+	};
+
+	struct SEL : public Expression {
+
+
+		EXPR_OBJ() array;
+		EXPR_OBJ() item;
+		EXPR_OBJ() result;
+
+		SEL(EXPR_OBJ() array_in, EXPR_OBJ() item_in, EXPR_OBJ() result_in) {
+
+			array = std::move(array_in);
+			item = std::move(item_in);
+			result = std::move(result_in);
+		}
+
+		llvm::Value* codegen() override;
+
+		std::string ToLLMascal() override {
+
+			std::string res;
+
+			res += "SEL(";
+			res += array->ToLLMascal();
+			res += ", ";
+			res += item->ToLLMascal();
+			res += ", ";
+			res += result->ToLLMascal();
+			res += ")";
+			
+			return res;
+		}
+
+		DEFAULT_TOLLMASCALBEFORE()
+
+		void ReplaceTargetNameTo(std::string from, std::string to) override {
+
+			array->ReplaceTargetNameTo(from, to);
+			item->ReplaceTargetNameTo(from, to);
+			result->ReplaceTargetNameTo(from, to);
+		}
+
+		bool ContainsName(std::string str) override {
+
+			if(array->ContainsName(str)) {
+				return true;
+			}
+
+			if(item->ContainsName(str)) {
+				return true;
+			}
+
+			if(result->ContainsName(str)) {
+				return true;
+			}
+
+			return false;
+		}
+
+		EXPR_OBJ() Clone() override {
+
+			return std::make_unique<SEL>(array->Clone(), item->Clone(), result->Clone());
 		}
 	};
 

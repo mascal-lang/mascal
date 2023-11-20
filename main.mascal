@@ -1,15 +1,23 @@
 program begin
 
-	com x: i32 = 0;
-	com y: i32 = 6;
+	mem z: [i32, 5];
 
-	block Loop1 begin
-		x += 1;
-		
-		if COMPARE.IsLessThan(x, 100) then goto Loop1;
+	com count: i32 = 0;
+
+	block LoopdiLoop begin
+
+		mem item: &i32 = GEL(z, count) as i32;
+
+		item = count;
+
+		count += 1;
+
+		if COMPARE.IsLessThan(count, 5) then goto LoopdiLoop;
 		end;
+
 	end;
 
-	return x;
+	mem item_final: &i32 = GEL(z, 4) as i32;
+	return item_final;
 
 end

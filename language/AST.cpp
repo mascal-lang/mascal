@@ -50,6 +50,10 @@ llvm::Type* AST::Integer1::codegen() { return llvm::IntegerType::getInt1Ty(*Code
 
 llvm::Type* AST::Void::codegen() { return llvm::IntegerType::getVoidTy(*CodeGen::TheContext); }
 
+llvm::Type* AST::Array::codegen() { return llvm::ArrayType::get(childTy->codegen(), elements); }
+
+llvm::Type* AST::Ref::codegen() { return llvm::PointerType::getUnqual(*CodeGen::TheContext); }
+
 llvm::Value* AST::RetVoid::codegen() { return nullptr; }
 
 llvm::Value* AST::ProcedureCall::codegen() {
@@ -68,6 +72,16 @@ llvm::Value* AST::IntNumber::codegen() {
 
 	if(isa<llvm::IntegerType>(ty_codegen)) {
 		int_ty = dyn_cast<llvm::IntegerType>(ty_codegen);
+	}
+	else if(dynamic_cast<AST::Ref*>(ty.get()) != nullptr) {
+		llvm::Type* childTy_codegen = ty->childTy->codegen();
+
+		if(isa<llvm::IntegerType>(childTy_codegen)) {
+			int_ty = dyn_cast<llvm::IntegerType>(childTy_codegen);
+		}
+		else {
+			std::cout << "Oopsie daisy!\n";
+		}
 	}
 	else {
 		std::cout << "Oops!\n";
@@ -101,7 +115,13 @@ llvm::Value* AST::Variable::codegen() {
 
 llvm::Value* AST::Com::codegen() {
 
-	llvm::Value* tc = AST::GetOrCreateInstruction(target.get());
+	llvm::Value* tc;
+
+	llvm::Type* get_type = ty->codegen();
+
+	if(target != nullptr) { tc = AST::GetOrCreateInstruction(target.get()); }
+	else if(get_type->isArrayTy()) { tc = CodeGen::DefaultFromType(get_type, get_type->getArrayElementType()); }
+	else { tc = CodeGen::DefaultFromType(get_type); }
 
 	std::unique_ptr<LLVM_Com> lcom = std::make_unique<LLVM_Com>();
 	lcom->origin = tc;
@@ -118,19 +138,41 @@ llvm::Value* AST::Com::codegen() {
 
 llvm::Value* AST::Mem::codegen() {
 
-	llvm::Value* tc = AST::GetOrCreateInstruction(target.get());
-
-	std::unique_ptr<LLVM_Mem> lmem = std::make_unique<LLVM_Mem>();
+	llvm::Value* tc = nullptr;
 
 	llvm::Type* get_type = ty->codegen();
 
-	llvm::Value* alloc_origin = CodeGen::Builder->CreateAlloca(get_type, 0, name);
+	if(target != nullptr) { tc = AST::GetOrCreateInstruction(target.get()); }
+	else if(get_type->isArrayTy()) { tc = CodeGen::DefaultFromType(get_type, get_type->getArrayElementType()); }
+	else { tc = CodeGen::DefaultFromType(get_type); }
+
+	std::unique_ptr<LLVM_Mem> lmem = std::make_unique<LLVM_Mem>();
+
+	llvm::Value* alloc_origin = nullptr;
+
+	bool isRef = dynamic_cast<AST::Ref*>(ty.get()) != nullptr;
+
+	if(!isRef) {
+		alloc_origin = CodeGen::Builder->CreateAlloca(get_type, 0, name);
+	}
+	else {
+		alloc_origin = tc;
+	}
+
 	lmem->origin = alloc_origin;
 
-	llvm::Value* store_target = CodeGen::Builder->CreateStore(tc, lmem->origin);
+	if(!isRef) {
+		CodeGen::Builder->CreateStore(tc, lmem->origin);
+	}
+
 	lmem->current = alloc_origin;
 
-	lmem->ty = get_type;
+	if(!isRef) {
+		lmem->ty = get_type;
+	}
+	else {
+		lmem->ty = ty->childTy->codegen();
+	}
 
 	CodeGen::all_mems[name] = std::move(lmem);
 
@@ -411,6 +453,34 @@ llvm::BasicBlock* GetAOTBasicBlock(std::string name) {
 
 	std::cout << "Error: Block '" << name << "' not found inside codegen.\n";
 	exit(1);
+	return nullptr;
+}
+
+llvm::Value* AST::GEL::codegen() {
+
+	llvm::Value* arrayCG = AST::GetOrCreateInstruction(array.get());
+
+	llvm::Value* itemCG = AST::GetOrCreateInstruction(item.get());
+
+	llvm::Value* indexList[1] = { itemCG };
+
+	llvm::Type* tyCG = ty->codegen();
+
+	auto gel = CodeGen::Builder->CreateInBoundsGEP(tyCG, arrayCG, llvm::ArrayRef<llvm::Value*>(indexList, 1), "GEL");
+
+	return gel;
+}
+
+llvm::Value* AST::SEL::codegen() {
+
+	llvm::Value* arrayCG = AST::GetOrCreateInstruction(array.get());
+
+	llvm::Value* indexList[1] = {AST::GetOrCreateInstruction(item.get())};
+
+	auto gel = CodeGen::Builder->CreateGEP(arrayCG->getType()->getArrayElementType(), arrayCG, llvm::ArrayRef<llvm::Value*>(indexList, 1), "SEL");
+
+	CodeGen::Builder->CreateStore(AST::GetOrCreateInstruction(result.get()), gel);
+
 	return nullptr;
 }
 

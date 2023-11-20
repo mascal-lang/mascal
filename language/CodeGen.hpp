@@ -98,6 +98,9 @@ struct CodeGen {
 	static std::unique_ptr<llvm::Module> TheModule;
 
 	static void Initialize();
+
+	static llvm::Value* Default(llvm::Value* v);
+	static llvm::Constant* DefaultFromType(llvm::Type* t, llvm::Type* arrayElementT = nullptr);
 };
 
 #endif

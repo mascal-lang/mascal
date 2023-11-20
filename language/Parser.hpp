@@ -94,19 +94,6 @@ struct Parser {
 		return nullptr;
 	}
 
-	static std::unique_ptr<AST::Type> CopyType(AST::Type* t) {
-
-		if(dynamic_cast<AST::Integer128*>(t)) { return std::make_unique<AST::Integer128>(); }
-		else if(dynamic_cast<AST::Integer64*>(t)) { return std::make_unique<AST::Integer64>(); }
-		else if(dynamic_cast<AST::Integer32*>(t)) { return std::make_unique<AST::Integer32>(); }
-		else if(dynamic_cast<AST::Integer16*>(t)) { return std::make_unique<AST::Integer16>(); }
-		else if(dynamic_cast<AST::Integer8*>(t)) { return std::make_unique<AST::Integer8>(); }
-		else if(dynamic_cast<AST::Integer1*>(t)) { return std::make_unique<AST::Integer1>(); }
-
-		ExprError("Variable type to Copy not found.");
-		return nullptr;
-	}
-
 	static void StartMainTargetSystem() {
 
 		Parser::main_target.clear();
@@ -254,7 +241,7 @@ struct Parser {
 			return std::make_unique<AST::IntNumber>(n, std::make_unique<AST::Integer32>());
 		}
 
-		return std::make_unique<AST::IntNumber>(n, CopyType(FindType(Parser::main_target)));
+		return std::make_unique<AST::IntNumber>(n, FindType(Parser::main_target)->Clone());
 	}
 
 	static std::unique_ptr<AST::Type> IdentStrToType() {
@@ -270,7 +257,84 @@ struct Parser {
 
 		else if(curr_ident == "void") { return std::make_unique<AST::Void>(); }
 
-		ExprError("Unknown type found.");
+		else if(curr_ident == "Array" || Lexer::CurrentToken == '[') {
+
+			bool square_brackets = Lexer::CurrentToken == '[';
+
+			Lexer::GetNextToken();
+
+			if(!square_brackets) {
+
+				if(Lexer::CurrentToken != '<') {
+					ExprError("Expected '<' to add array type.");
+				}
+
+				Lexer::GetNextToken();
+			}
+
+			auto T = IdentStrToType();
+
+			Lexer::GetNextToken();
+
+			uint64_t numElements = 0;
+
+			if(Lexer::CurrentToken == ',') {
+				Lexer::GetNextToken();
+
+				if(Lexer::CurrentToken != Token::Number) {
+					ExprError("Expected number to set amount of elements in array.");
+				}
+
+				numElements = std::stoi(Lexer::NumValString);
+
+				Lexer::GetNextToken();
+			}
+
+			if(!square_brackets) {
+				if(Lexer::CurrentToken != '>') {
+					ExprError("Expected '>' to close array.");
+				}
+			}
+			else {
+				if(Lexer::CurrentToken != ']') {
+					ExprError("Expected ']' to close array.");
+				}
+			}
+
+			return std::make_unique<AST::Array>(std::move(T), numElements);
+		}
+
+		else if(curr_ident == "Ref") {
+
+			Lexer::GetNextToken();
+
+			if(Lexer::CurrentToken != '<') {
+				ExprError("Expected '<' to add reference type.");
+			}
+
+			Lexer::GetNextToken();
+
+			auto T = IdentStrToType();
+
+			Lexer::GetNextToken();
+
+			if(Lexer::CurrentToken != '>') {
+				ExprError("Expected '>' to close array.");
+			}
+
+			return std::make_unique<AST::Ref>(std::move(T));
+		}
+
+		else if(Lexer::CurrentToken == '&') {
+
+			Lexer::GetNextToken();
+
+			auto T = IdentStrToType();
+
+			return std::make_unique<AST::Ref>(std::move(T));
+		}
+
+		ExprError("Unknown type '" + curr_ident + "' found.");
 		return nullptr;
 	}
 
@@ -290,19 +354,22 @@ struct Parser {
 
 		std::unique_ptr<AST::Type> ty = IdentStrToType();
 
-		Lexer::GetNextToken();
-
-		if(Lexer::CurrentToken != '=') { ExprError("Expected '='."); }
-
-		Lexer::GetNextToken();
-
 		AddParserCom(idName, ty.get());
 
-		std::unique_ptr<AST::Expression> expr = ParseExpression();
+		Lexer::GetNextToken();
 
-		auto final_com = std::make_unique<AST::Com>(idName, std::move(ty), std::move(expr));
+		std::unique_ptr<AST::Expression> expr;
 
-		return final_com;
+		if(Lexer::CurrentToken == '=') {
+
+			Lexer::GetNextToken();
+
+			expr = ParseExpression();
+
+			return std::make_unique<AST::Com>(idName, std::move(ty), std::move(expr));
+		}
+
+		return std::make_unique<AST::Com>(idName, std::move(ty), nullptr);
 	}
 
 	static std::unique_ptr<AST::Expression> ParseMem() {
@@ -321,19 +388,22 @@ struct Parser {
 
 		std::unique_ptr<AST::Type> ty = IdentStrToType();
 
-		Lexer::GetNextToken();
-
-		if(Lexer::CurrentToken != '=') { ExprError("Expected '='."); }
-
-		Lexer::GetNextToken();
-
 		AddParserMem(idName, ty.get());
 
-		std::unique_ptr<AST::Expression> expr = ParseExpression();
+		Lexer::GetNextToken();
 
-		auto final_mem = std::make_unique<AST::Mem>(idName, std::move(ty), std::move(expr));
+		std::unique_ptr<AST::Expression> expr;
 
-		return final_mem;
+		if(Lexer::CurrentToken == '=') {
+
+			Lexer::GetNextToken();
+
+			expr = ParseExpression();
+
+			return std::make_unique<AST::Mem>(idName, std::move(ty), std::move(expr));
+		}
+
+		return std::make_unique<AST::Mem>(idName, std::move(ty), nullptr);
 	}
 
 	static std::unique_ptr<AST::Expression> ParseLLReturn() {
@@ -771,6 +841,82 @@ struct Parser {
 		return std::make_unique<AST::Goto>(blockName);
 	}
 
+	static std::unique_ptr<AST::Expression> ParseGEL() {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '(') {
+			ExprError("Expected '('.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto I = ParseIdentifier();
+
+		if(Lexer::CurrentToken != ',') {
+			ExprError("Expected ','.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto E = ParseExpression();
+
+		if(Lexer::CurrentToken != ')') {
+			ExprError("Expected ')'.");
+		}
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != Token::As) {
+			ExprError("Expected 'as'.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto T = IdentStrToType();
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::GEL>(std::move(I), MemTreatment(std::move(E)), std::move(T));
+	}
+
+	static std::unique_ptr<AST::Expression> ParseSEL() {
+
+		Lexer::GetNextToken();
+
+		if(Lexer::CurrentToken != '(') {
+			ExprError("Expected '('.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto I = ParseIdentifier();
+
+		if(Lexer::CurrentToken != ',') {
+			ExprError("Expected ','.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto E = ParseExpression();
+
+		if(Lexer::CurrentToken != ',') {
+			ExprError("Expected ','.");
+		}
+
+		Lexer::GetNextToken();
+
+		auto R = ParseExpression();
+
+		if(Lexer::CurrentToken != ')') {
+			ExprError("Expected ')'.");
+		}
+
+		Lexer::GetNextToken();
+
+		return std::make_unique<AST::SEL>(std::move(I), std::move(E), std::move(R));
+	}
+
 	static std::unique_ptr<AST::Expression> ParsePrimary() {
 
 		if(Lexer::CurrentToken == Token::Identifier) 	{ return ParseIdentifier(); }
@@ -804,6 +950,9 @@ struct Parser {
 		else if(Lexer::CurrentToken == Token::Block) { return ParseBlock(); }
 		else if(Lexer::CurrentToken == Token::Goto) { return ParseGoto(); }
 
+		else if(Lexer::CurrentToken == Token::GEL) { return ParseGEL(); }
+		else if(Lexer::CurrentToken == Token::SEL) { return ParseSEL(); }
+
 		ExprError("Unknown expression found. Found Token Number: " + std::to_string(Lexer::CurrentToken));
 		return nullptr;
 	}
@@ -815,7 +964,7 @@ struct Parser {
 
 		auto newCom = std::make_unique<AST::Com>(
 			Parser::all_parser_mems[V->name]->loadVariableName, 
-			CopyType(Parser::all_parser_mems[V->name]->ty),
+			Parser::all_parser_mems[V->name]->ty->Clone(),
 			std::make_unique<AST::LoadMem>(std::move(V))
 		);
 

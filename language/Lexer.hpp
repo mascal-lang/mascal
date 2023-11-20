@@ -53,6 +53,11 @@ enum Token
 
 	Block = -29,
 	Goto = -30,
+
+	GEL = -31,
+	SEL = -32,
+
+	As = -33,
 };
 
 enum LexerIsInside {
@@ -272,6 +277,11 @@ struct Lexer
 
 		else if(IsIdentifier("block")) return Token::Block;
 		else if(IsIdentifier("goto")) return Token::Goto;
+
+		else if(IsIdentifier("GEL")) return Token::GEL;
+		else if(IsIdentifier("SEL")) return Token::SEL;
+
+		else if(IsIdentifier("as")) return Token::As;
 
 		return Token::Identifier;
 	}

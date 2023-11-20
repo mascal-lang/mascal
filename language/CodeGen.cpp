@@ -32,13 +32,37 @@ void CodeGen::AddPHINodeToVec(std::string name, llvm::PHINode* p) {
 	CodeGen::all_phi_nodes.push_back(std::make_pair(name, p));
 }
 
-llvm::Value* Default(llvm::Value* v) {
+llvm::Value* CodeGen::Default(llvm::Value* v) {
 
-	if(dyn_cast<llvm::IntegerType>(v->getType()) != nullptr) {
+	return CodeGen::DefaultFromType(v->getType());
+}
 
-		auto intType = dyn_cast<llvm::IntegerType>(v->getType());
+llvm::Constant* CodeGen::DefaultFromType(llvm::Type* t, llvm::Type* arrayElementT) {
+
+	if(dyn_cast<llvm::IntegerType>(t) != nullptr) {
+
+		auto intType = dyn_cast<llvm::IntegerType>(t);
 
 		return llvm::ConstantInt::get(*CodeGen::TheContext, llvm::APInt(intType->getBitWidth(), 0, true));
+	}
+
+	else if(dyn_cast<llvm::ArrayType>(t) != nullptr) {
+
+		if(arrayElementT == nullptr) {
+
+			std::cout << "Error: Array Element Type not found.\n";
+			exit(1);
+		}
+
+		auto arrType = dyn_cast<llvm::ArrayType>(t);
+
+		std::vector<llvm::Constant*> a;
+
+		for(int i = 0; i < arrType->getNumElements(); i++) {
+			a.push_back(CodeGen::DefaultFromType(arrayElementT));
+		}
+
+		return llvm::ConstantArray::get(arrType, llvm::ArrayRef(a));
 	}
 
 	std::cout << "Error: Type not found.\n";
